@@ -1,0 +1,1292 @@
+<!-- Onboarding 2 - Unified - Car Hero -->
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Car Hero - Onboarding 2</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary-fixed-variant": "#613082",
+                    "on-secondary-container": "#694c81",
+                    "tertiary-fixed": "#f4d9ff",
+                    "tertiary-container": "#994fc9",
+                    "surface-container": "#f0ecf6",
+                    "secondary-container": "#e5c1ff",
+                    "surface": "#fcf8ff",
+                    "primary": "#754396",
+                    "surface-variant": "#e4e1eb",
+                    "on-secondary-fixed-variant": "#573b6e",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-fixed-variant": "#6a1b9a",
+                    "on-primary-fixed": "#2f004c",
+                    "inverse-surface": "#303037",
+                    "tertiary": "#7f34ae",
+                    "on-background": "#1b1b22",
+                    "primary-fixed-dim": "#e3b5ff",
+                    "on-tertiary": "#ffffff",
+                    "on-secondary-fixed": "#290d40",
+                    "surface-container-high": "#eae6f0",
+                    "primary-fixed": "#f4daff",
+                    "secondary": "#705288",
+                    "error": "#ba1a1a",
+                    "surface-tint": "#7a489c",
+                    "on-tertiary-container": "#fff4fe",
+                    "on-surface-variant": "#4c444f",
+                    "on-error": "#ffffff",
+                    "inverse-on-surface": "#f3eff9",
+                    "error-container": "#ffdad6",
+                    "surface-container-low": "#f6f2fc",
+                    "on-primary-container": "#fff5fe",
+                    "surface-dim": "#dcd8e2",
+                    "on-tertiary-fixed": "#2f004b",
+                    "surface-container-highest": "#e4e1eb",
+                    "primary-container": "#8f5cb1",
+                    "surface-bright": "#fcf8ff",
+                    "secondary-fixed": "#f1daff",
+                    "outline": "#7e7480",
+                    "on-secondary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-surface": "#1b1b22",
+                    "background": "#fcf8ff",
+                    "inverse-primary": "#e3b5ff",
+                    "tertiary-fixed-dim": "#e4b5ff",
+                    "secondary-fixed-dim": "#dcb9f6",
+                    "outline-variant": "#cfc3d1",
+                    "on-primary": "#ffffff"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "unit": "8px",
+                    "container-margin": "20px",
+                    "touch-target-min": "48px",
+                    "gutter": "16px"
+            },
+            "fontFamily": {
+                    "title-md": ["Plus Jakarta Sans", "sans-serif"],
+                    "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+                    "body-md": ["Plus Jakarta Sans", "sans-serif"],
+                    "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+                    "headline-lg-mobile": ["Plus Jakarta Sans", "sans-serif"],
+                    "display-lg": ["Plus Jakarta Sans", "sans-serif"],
+                    "body-lg": ["Plus Jakarta Sans", "sans-serif"]
+            },
+            "fontSize": {
+                    "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                    "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                    "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                    "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                    "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                    "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                    "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+            }
+          }
+        }
+      }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Main Mobile Container -->
+<main class="relative w-full h-[100dvh] max-w-md mx-auto overflow-hidden bg-surface flex flex-col shadow-2xl">
+<!-- Background Illustration -->
+<div class="absolute inset-0 z-0 bg-surface-container-low">
+<img alt="Car Hero Background Illustration" class="w-full h-[70%] object-cover object-top" src="https://lh3.googleusercontent.com/aida/AP1WRLsCqJZFQZ4mUUvhAKcj6j8u_3F8dLeXwgPMPTSpbT4w9eM7hnYeML8G0Z0OWBVZAIlhHdaOdgjdlVRYIWIfuDAaVmFoO6A8RDXQUWrU1e5zqWoF6kt-Qhrkm0vOZuawvr7Nx5rL2eiYEtj699snL_cxCF98iEyli_q79v1JqF7TyB0MRPGe0UXato4JUzKNnXlVTQtjTT7dLf2Yh0XXzhQmQqGhFxGEaePsOtUhpxDpjcAk_2X6nd-TxQ"/>
+<!-- Subtle gradient to blend image into the bottom card area -->
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface/80"></div>
+</div>
+<!-- Skip Button (Top Left in RTL context) -->
+<div class="absolute top-0 left-0 w-full px-container-margin pt-10 z-20 flex justify-end">
+<button class="h-touch-target-min px-4 flex items-center justify-center font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                تخطي
+            </button>
+</div>
+<!-- Spacer to push card to bottom -->
+<div class="flex-grow z-10 pointer-events-none"></div>
+<!-- Bottom Content Card (Glassmorphism) -->
+<div class="relative z-20 w-full bg-surface/90 backdrop-blur-xl rounded-t-[32px] px-container-margin pt-10 pb-12 flex flex-col items-center gap-8 shadow-[0_-10px_40px_rgba(117,67,150,0.08)] border-t border-outline-variant/20">
+<!-- Text Content -->
+<div class="flex flex-col items-center gap-4 text-center w-full px-2">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary">
+                    كل خدمات سيارتك بمكان واحد
+                </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">
+                    ونش، بطارية، بنشر، وقود، ميكانيكي، وغسيل سيارة بسهولة
+                </p>
+</div>
+<!-- Progress Dots -->
+<div class="flex items-center justify-center gap-2 py-2 w-full">
+<div class="w-2 h-2 rounded-full bg-surface-variant transition-all duration-300"></div>
+<div class="w-6 h-2 rounded-full bg-primary-container transition-all duration-300 shadow-[0_0_8px_rgba(143,92,177,0.4)]"></div>
+<div class="w-2 h-2 rounded-full bg-surface-variant transition-all duration-300"></div>
+</div>
+<!-- Primary Action Button -->
+<button class="w-full h-[56px] rounded-xl bg-primary-container text-on-primary-container font-title-md text-title-md shadow-md hover:shadow-lg hover:bg-primary transition-all duration-200 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface flex items-center justify-center">
+                التالي
+            </button>
+</div>
+</main>
+</body></html>
+
+<!-- Onboarding 1 - Unified - Car Hero -->
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Car Hero - Onboarding</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed-variant": "#613082",
+                        "on-secondary-container": "#694c81",
+                        "tertiary-fixed": "#f4d9ff",
+                        "tertiary-container": "#994fc9",
+                        "surface-container": "#f0ecf6",
+                        "secondary-container": "#e5c1ff",
+                        "surface": "#fcf8ff",
+                        "primary": "#754396",
+                        "surface-variant": "#e4e1eb",
+                        "on-secondary-fixed-variant": "#573b6e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#6a1b9a",
+                        "on-primary-fixed": "#2f004c",
+                        "inverse-surface": "#303037",
+                        "tertiary": "#7f34ae",
+                        "on-background": "#1b1b22",
+                        "primary-fixed-dim": "#e3b5ff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#290d40",
+                        "surface-container-high": "#eae6f0",
+                        "primary-fixed": "#f4daff",
+                        "secondary": "#705288",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#7a489c",
+                        "on-tertiary-container": "#fff4fe",
+                        "on-surface-variant": "#4c444f",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f3eff9",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f6f2fc",
+                        "on-primary-container": "#fff5fe",
+                        "surface-dim": "#dcd8e2",
+                        "on-tertiary-fixed": "#2f004b",
+                        "surface-container-highest": "#e4e1eb",
+                        "primary-container": "#8f5cb1",
+                        "surface-bright": "#fcf8ff",
+                        "secondary-fixed": "#f1daff",
+                        "outline": "#7e7480",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b22",
+                        "background": "#fcf8ff",
+                        "inverse-primary": "#e3b5ff",
+                        "tertiary-fixed-dim": "#e4b5ff",
+                        "secondary-fixed-dim": "#dcb9f6",
+                        "outline-variant": "#cfc3d1",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem",
+                        "4xl": "2rem"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "container-margin": "20px",
+                        "touch-target-min": "48px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Plus Jakarta Sans", "sans-serif"],
+                        "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+                        "body-md": ["Plus Jakarta Sans", "sans-serif"],
+                        "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans", "sans-serif"],
+                        "display-lg": ["Plus Jakarta Sans", "sans-serif"],
+                        "body-lg": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-background antialiased h-screen w-full overflow-hidden flex flex-col">
+<!-- Main Container -->
+<main class="relative flex-1 w-full h-full flex flex-col">
+<!-- Full Bleed Background Image -->
+<div class="absolute inset-0 w-full h-full z-0 bg-surface-container">
+<img alt="Car Hero Background" class="w-full h-full object-cover object-center" src="https://lh3.googleusercontent.com/aida/AP1WRLux3_urAUXlJAtBzvVF8sky1-0zpPAcv4EJpIcZn-A46PSxUF072VzWzt-gM33pUYwFKbaXfPcTCkm-vc4gD1deUwMPubfvlEibLpKlAkwQjYEy_o5MCXD0d3xcWJkw6Rd6UghIojS8qLWb7VTk2ByAqp0OS3s5q8qWr-uNvu_RKdY1cExflIlYVPUIQqiTg5iDtd1sZwFNOBay7Ecoc0c3FGldew5zCKzBkEsWZWxwuldWfgf9m2pAcLI"/>
+</div>
+<!-- Skip Link -->
+<div class="absolute top-0 left-0 p-container-margin z-20">
+<button class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors duration-200 bg-surface/50 backdrop-blur-md px-4 py-2 rounded-full shadow-sm">
+                تخطي
+            </button>
+</div>
+<!-- Spacer for alignment -->
+<div class="flex-1 z-10 pointer-events-none"></div>
+<!-- Bottom Glassmorphic Card -->
+<div class="relative z-20 w-full bg-surface/85 backdrop-blur-xl rounded-t-4xl px-container-margin pt-10 pb-12 shadow-[0_-8px_32px_rgba(117,67,150,0.08)] border-t border-white/40 flex flex-col items-center text-center">
+<!-- Title -->
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary mb-4 tracking-tight">
+                مساعدة فورية أينما كنت
+            </h1>
+<!-- Subtitle -->
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-[300px]">
+                اطلب أقرب فني أو ونش خلال ثواني عند تعطل سيارتك
+            </p>
+<!-- Progress Dots -->
+<div class="flex items-center gap-2 mb-10">
+<div class="h-2 w-6 rounded-full bg-primary-container transition-all duration-300"></div>
+<div class="h-2 w-2 rounded-full bg-surface-variant transition-all duration-300"></div>
+<div class="h-2 w-2 rounded-full bg-surface-variant transition-all duration-300"></div>
+</div>
+<!-- Primary Button -->
+<button class="w-full h-[56px] rounded-xl bg-primary-container text-white font-title-md text-title-md shadow-lg shadow-primary-container/20 hover:bg-primary transition-all duration-200 active:scale-[0.98] flex items-center justify-center relative overflow-hidden group">
+<span class="relative z-10">التالي</span>
+<div class="absolute inset-0 bg-white/10 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-500 ease-in-out"></div>
+</button>
+</div>
+</main>
+</body></html>
+
+<!-- Onboarding 3 - Unified - Car Hero -->
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Car Hero - Onboarding 3</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed-variant": "#613082",
+                        "on-secondary-container": "#694c81",
+                        "tertiary-fixed": "#f4d9ff",
+                        "tertiary-container": "#994fc9",
+                        "surface-container": "#f0ecf6",
+                        "secondary-container": "#e5c1ff",
+                        "surface": "#fcf8ff",
+                        "primary": "#754396",
+                        "surface-variant": "#e4e1eb",
+                        "on-secondary-fixed-variant": "#573b6e",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed-variant": "#6a1b9a",
+                        "on-primary-fixed": "#2f004c",
+                        "inverse-surface": "#303037",
+                        "tertiary": "#7f34ae",
+                        "on-background": "#1b1b22",
+                        "primary-fixed-dim": "#e3b5ff",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-fixed": "#290d40",
+                        "surface-container-high": "#eae6f0",
+                        "primary-fixed": "#f4daff",
+                        "secondary": "#705288",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#7a489c",
+                        "on-tertiary-container": "#fff4fe",
+                        "on-surface-variant": "#4c444f",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f3eff9",
+                        "error-container": "#ffdad6",
+                        "surface-container-low": "#f6f2fc",
+                        "on-primary-container": "#fff5fe",
+                        "surface-dim": "#dcd8e2",
+                        "on-tertiary-fixed": "#2f004b",
+                        "surface-container-highest": "#e4e1eb",
+                        "primary-container": "#8f5cb1",
+                        "surface-bright": "#fcf8ff",
+                        "secondary-fixed": "#f1daff",
+                        "outline": "#7e7480",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b22",
+                        "background": "#fcf8ff",
+                        "inverse-primary": "#e3b5ff",
+                        "tertiary-fixed-dim": "#e4b5ff",
+                        "secondary-fixed-dim": "#dcb9f6",
+                        "outline-variant": "#cfc3d1",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "unit": "8px",
+                        "container-margin": "20px",
+                        "touch-target-min": "48px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Plus Jakarta Sans", "sans-serif"],
+                        "headline-lg": ["Plus Jakarta Sans", "sans-serif"],
+                        "body-md": ["Plus Jakarta Sans", "sans-serif"],
+                        "label-sm": ["Plus Jakarta Sans", "sans-serif"],
+                        "headline-lg-mobile": ["Plus Jakarta Sans", "sans-serif"],
+                        "display-lg": ["Plus Jakarta Sans", "sans-serif"],
+                        "body-lg": ["Plus Jakarta Sans", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "title-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-sm": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "700" }],
+                        "display-lg": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 -8px 32px rgba(117, 67, 150, 0.08);
+        }
+        .progress-dot { transition: all 0.3s ease-in-out; }
+        .progress-dot.active { width: 24px; background-color: #8f5cb1; }
+        .progress-dot.inactive { width: 8px; background-color: #E0D4F0; }
+    </style>
+</head>
+<body class="bg-surface h-screen w-full flex flex-col relative overflow-hidden">
+<!-- Full Bleed Background Image -->
+<img alt="Live tracking isometric illustration" class="absolute inset-0 w-full h-full object-cover z-0" src="https://lh3.googleusercontent.com/aida/AP1WRLtQ483pxLC3J2pJp_8F56Um6Rn9bmWlAdjM0SqG4Vk_JBDRPq34ucTmePYGAGnUTgU81i1Umw1pRx_IVo4BnFpeTe5cbaL3RSPqQnCyfew0vgCH03aRLlRD3VEupGbD4zaO4TKsPJ9DuojWVp7NxIOHELnaBOGH7v1ymJ7QPTjzF2jJ2USuAvVZ-Ev5tP7N4T9Vqp9IRLCCAkBX_YcbKEwM03Yag-WhPYD78UwQxdanjuEX6liMLadNZ2s"/>
+<!-- Top Area (Skip) -->
+<div class="relative z-10 pt-safe px-container-margin mt-4 flex justify-end w-full">
+<button class="h-touch-target-min px-4 font-label-sm text-label-sm text-primary-container bg-surface-container-lowest/50 backdrop-blur-md rounded-full hover:bg-surface-container-lowest/80 transition-colors">
+            تخطي
+        </button>
+</div>
+<!-- Bottom Content Card -->
+<div class="relative z-10 mt-auto w-full pt-8">
+<div class="glass-card rounded-t-[32px] px-container-margin pt-8 pb-10 flex flex-col gap-8">
+<!-- Text Content -->
+<div class="text-center flex flex-col gap-3">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-primary">تتبع الفني لحظة بلحظة</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-sm mx-auto">شاهد الفني على الخريطة وتواصل معه بسهولة حتى يصل إليك</p>
+</div>
+<!-- Progress Indicators -->
+<div class="flex justify-center items-center gap-2">
+<div class="progress-dot inactive h-2 rounded-full"></div>
+<div class="progress-dot inactive h-2 rounded-full"></div>
+<div class="progress-dot active h-2 rounded-full"></div>
+</div>
+<!-- CTA Button -->
+<button class="w-full h-14 bg-primary-container text-on-primary rounded-xl font-title-md text-title-md shadow-lg shadow-primary-container/30 hover:bg-primary transition-colors active:scale-[0.98]">
+                ابدأ الآن
+            </button>
+</div>
+</div>
+</body></html>
+
+<!-- Login - Ultra Premium - Car Hero -->
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>تسجيل الدخول - Car Hero</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "secondary-container": "#e5c1ff",
+                "surface-dim": "#dcd8e2",
+                "surface-container-low": "#f6f2fc",
+                "primary-container": "#8f5cb1",
+                "on-tertiary-fixed": "#2f004b",
+                "outline": "#7e7480",
+                "surface-tint": "#7a489c",
+                "on-primary-fixed": "#2f004c",
+                "inverse-primary": "#e3b5ff",
+                "secondary": "#705288",
+                "surface-container-lowest": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-tertiary-fixed-variant": "#6a1b9a",
+                "error": "#ba1a1a",
+                "on-secondary": "#ffffff",
+                "on-surface-variant": "#4c444f",
+                "on-error-container": "#93000a",
+                "primary": "#754396",
+                "on-surface": "#1b1b22",
+                "outline-variant": "#cfc3d1",
+                "on-tertiary-container": "#fff4fe",
+                "on-secondary-fixed": "#290d40",
+                "on-primary-fixed-variant": "#613082",
+                "on-secondary-container": "#694c81",
+                "inverse-surface": "#303037",
+                "tertiary-fixed-dim": "#e4b5ff",
+                "on-tertiary": "#ffffff",
+                "surface-bright": "#fcf8ff",
+                "surface-container-high": "#eae6f0",
+                "surface-container": "#f0ecf6",
+                "tertiary": "#7f34ae",
+                "secondary-fixed": "#f1daff",
+                "background": "#fcf8ff",
+                "on-background": "#1b1b22",
+                "primary-fixed-dim": "#e3b5ff",
+                "tertiary-container": "#994fc9",
+                "tertiary-fixed": "#f4d9ff",
+                "on-secondary-fixed-variant": "#573b6e",
+                "secondary-fixed-dim": "#dcb9f6",
+                "on-error": "#ffffff",
+                "on-primary-container": "#fff5fe",
+                "surface-variant": "#e4e1eb",
+                "error-container": "#ffdad6",
+                "surface-container-highest": "#e4e1eb",
+                "inverse-on-surface": "#f3eff9",
+                "primary-fixed": "#f4daff",
+                "surface": "#fcf8ff"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "gutter": "16px",
+                "unit": "8px",
+                "touch-target-min": "48px",
+                "container-margin": "20px"
+        },
+        "fontFamily": {
+                "headline-lg": [
+                        "plusJakartaSans"
+                ],
+                "label-sm": [
+                        "plusJakartaSans"
+                ],
+                "title-md": [
+                        "plusJakartaSans"
+                ],
+                "body-md": [
+                        "plusJakartaSans"
+                ],
+                "body-lg": [
+                        "plusJakartaSans"
+                ],
+                "headline-lg-mobile": [
+                        "plusJakartaSans"
+                ],
+                "display-lg": [
+                        "plusJakartaSans"
+                ]
+        },
+        "fontSize": {
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "label-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: theme('colors.background');
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center from-surface-container-low via-surface to-secondary-container/30 text-on-background p-container-margin relative overflow-hidden bg-gradient-to-r">
+<!-- Decorative Background Elements -->
+<div class="absolute -top-40 -left-40 w-96 h-96 bg-primary-container/20 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="absolute top-1/2 right-[-20%] w-80 h-80 bg-secondary-container/30 rounded-full blur-[80px] pointer-events-none"></div>
+<div class="absolute -bottom-40 -left-20 w-[500px] h-[500px] bg-primary-fixed/40 rounded-full blur-[120px] pointer-events-none"></div>
+<div class="w-full max-w-md bg-white/70 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_32px_rgba(117,67,150,0.08)] border border-white/50 p-8 z-10 flex flex-col gap-8 relative">
+<!-- Header -->
+<div class="flex flex-col items-center gap-4 text-center">
+<div class="w-28 h-28 flex items-center justify-center mb-2">
+<img alt="Car Hero Logo" class="w-full h-full object-contain drop-shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYV8hIJk35Y7tOdZSVOuqceP7LC5PCjnV-l1XZpco4YQYKZmMxxc7ppxr_6tXw3jjGUfEOG2jMoJb78BZWrTCb7yknZSgOwNO-wXTAD84glhwsUExVvSg_rAmkMNhn1DRWIuit-c1Oumd8fe_gPkS0QgLFcR2qmpyPkzqllU73zNBCEzmvHSCgPWQR224Cj1PiP7k5nXxOVShqTcMsm6DDhQRcoOExMRPJrKYJFgN6FrEsx2bmJFDZlls56cMqLU9UMZbttX5BpnU">
+</div>
+<div>
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-[#6a1b9a] tracking-tight">Car Hero</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-[280px] mx-auto leading-relaxed">تسجيل الدخول للوصول إلى خدمات المساعدة على الطريق.</p>
+</div>
+</div>
+<!-- Form -->
+<form class="flex flex-col gap-6" onsubmit="event.preventDefault(); window.location.href='#';">
+<!-- Phone Input -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold" for="phone">رقم الهاتف السوري</label>
+<div class="flex flex-row-reverse bg-white/80 border border-primary-container/20 rounded-xl overflow-hidden focus-within:border-[#8f5cb1] focus-within:ring-2 focus-within:ring-[#8f5cb1]/20 transition-all shadow-sm">
+<div class="flex items-center justify-center px-4 bg-surface-container-low/50 border-r border-primary-container/10">
+<span class="font-body-md text-body-md text-on-surface-variant" dir="ltr">+963</span>
+</div>
+<div class="flex items-center justify-center px-4 text-primary-container/70">
+<i class="fa-solid fa-phone"></i>
+</div>
+<input class="flex-1 bg-transparent border-none focus:ring-0 px-2 py-4 font-body-md text-body-md text-on-surface text-left placeholder:text-on-surface-variant/50" dir="ltr" id="phone" placeholder="9XX XXX XXX" required="" type="tel">
+</div>
+</div>
+<!-- Password Input -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm text-on-surface font-semibold" for="password">كلمة المرور</label>
+<div class="relative flex items-center bg-white/80 border border-primary-container/20 rounded-xl overflow-hidden focus-within:border-[#8f5cb1] focus-within:ring-2 focus-within:ring-[#8f5cb1]/20 transition-all shadow-sm">
+<div class="flex items-center justify-center px-4 pl-2 text-primary-container/70">
+<i class="fa-solid fa-lock"></i>
+</div>
+<input class="flex-1 bg-transparent border-none focus:ring-0 px-2 py-4 font-body-md text-body-md text-on-surface w-full pr-0 placeholder:text-on-surface-variant/50" id="password" placeholder="••••••••" required="" type="password">
+<button class="absolute left-4 p-2 text-on-surface-variant/60 hover:text-[#8f5cb1] transition-colors" onclick="const p = document.getElementById('password'); p.type = p.type === 'password' ? 'text' : 'password'; this.querySelector('i').className = p.type === 'password' ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';" type="button">
+<i class="fa-solid fa-eye-slash"></i>
+</button>
+</div>
+<div class="flex justify-start mt-1">
+<a class="font-label-sm text-label-sm text-[#8f5cb1] hover:text-[#6a1b9a] transition-colors font-medium" href="#">نسيت كلمة المرور؟</a>
+</div>
+</div>
+<!-- Submit Button -->
+<button class="h-14 w-full bg-[#8f5cb1] text-white rounded-xl font-title-md text-title-md shadow-lg shadow-primary-container/20 hover:bg-[#7a489c] transition-all duration-200 active:scale-[0.98] mt-4 flex items-center justify-center relative overflow-hidden group" type="submit">
+<span class="relative z-10">تسجيل الدخول</span>
+<div class="absolute inset-0 bg-white/10 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-500 ease-in-out"></div>
+</button>
+<!-- Register Link -->
+<div class="text-center mt-2">
+<p class="font-body-md text-body-md text-on-surface-variant">
+                    لا تملك حساب؟ 
+                    <a class="text-[#8f5cb1] font-bold hover:text-[#6a1b9a] transition-colors" href="#">إنشاء حساب</a>
+</p>
+</div>
+</form>
+</div>
+<!-- Branding Footer -->
+<div class="absolute bottom-6 flex flex-col items-center gap-2 opacity-40 pointer-events-none">
+<i class="fa-solid fa-car-side text-[#8f5cb1] text-2xl"></i>
+<span class="font-label-sm text-label-sm text-[#8f5cb1] tracking-widest uppercase font-bold">Car Hero</span>
+</div>
+
+
+</body></html>
+
+<!-- Create Account - Unified Style - Car Hero -->
+<!DOCTYPE html><html class="light" dir="rtl" lang="ar" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Car Hero - إنشاء حساب</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "secondary-container": "#e5c1ff",
+                "surface-dim": "#dcd8e2",
+                "surface-container-low": "#f6f2fc",
+                "primary-container": "#8f5cb1",
+                "on-tertiary-fixed": "#2f004b",
+                "outline": "#7e7480",
+                "surface-tint": "#7a489c",
+                "on-primary-fixed": "#2f004c",
+                "inverse-primary": "#e3b5ff",
+                "secondary": "#705288",
+                "surface-container-lowest": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-tertiary-fixed-variant": "#6a1b9a",
+                "error": "#ba1a1a",
+                "on-secondary": "#ffffff",
+                "on-surface-variant": "#4c444f",
+                "on-error-container": "#93000a",
+                "primary": "#754396",
+                "on-surface": "#1b1b22",
+                "outline-variant": "#cfc3d1",
+                "on-tertiary-container": "#fff4fe",
+                "on-secondary-fixed": "#290d40",
+                "on-primary-fixed-variant": "#613082",
+                "on-secondary-container": "#694c81",
+                "inverse-surface": "#303037",
+                "tertiary-fixed-dim": "#e4b5ff",
+                "on-tertiary": "#ffffff",
+                "surface-bright": "#fcf8ff",
+                "surface-container-high": "#eae6f0",
+                "surface-container": "#f0ecf6",
+                "tertiary": "#7f34ae",
+                "secondary-fixed": "#f1daff",
+                "background": "#fcf8ff",
+                "on-background": "#1b1b22",
+                "primary-fixed-dim": "#e3b5ff",
+                "tertiary-container": "#994fc9",
+                "tertiary-fixed": "#f4d9ff",
+                "on-secondary-fixed-variant": "#573b6e",
+                "secondary-fixed-dim": "#dcb9f6",
+                "on-error": "#ffffff",
+                "on-primary-container": "#fff5fe",
+                "surface-variant": "#e4e1eb",
+                "error-container": "#ffdad6",
+                "surface-container-highest": "#e4e1eb",
+                "inverse-on-surface": "#f3eff9",
+                "primary-fixed": "#f4daff",
+                "surface": "#fcf8ff"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "gutter": "16px",
+                "unit": "8px",
+                "touch-target-min": "48px",
+                "container-margin": "20px"
+        },
+        "fontFamily": {
+                "headline-lg": [
+                        "plusJakartaSans"
+                ],
+                "label-sm": [
+                        "plusJakartaSans"
+                ],
+                "title-md": [
+                        "plusJakartaSans"
+                ],
+                "body-md": [
+                        "plusJakartaSans"
+                ],
+                "body-lg": [
+                        "plusJakartaSans"
+                ],
+                "headline-lg-mobile": [
+                        "plusJakartaSans"
+                ],
+                "display-lg": [
+                        "plusJakartaSans"
+                ]
+        },
+        "fontSize": {
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "label-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center from-surface-container-low via-surface to-secondary-container/30 text-on-background p-container-margin relative overflow-x-hidden font-body-md antialiased py-8 bg-gradient-to-b">
+<!-- Decorative Background Elements -->
+<div class="absolute -top-40 -left-40 w-96 h-96 bg-primary-container/20 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="absolute top-1/2 right-[-20%] w-80 h-80 bg-secondary-container/30 rounded-full blur-[80px] pointer-events-none"></div>
+<div class="absolute -bottom-40 -left-20 w-[500px] h-[500px] bg-primary-fixed/40 rounded-full blur-[120px] pointer-events-none"></div>
+<!-- Main Content Canvas -->
+<main class="w-full max-w-md z-10 relative flex flex-col">
+<!-- Form Card -->
+<div class="glass-panel rounded-[32px] p-[32px] shadow-[0_8px_32px_rgba(117,67,150,0.12)] border border-white/60 animate-[slideUp_0.6s_ease-out_0.2s_both] w-full">
+<!-- Logo section matching Login -->
+<div class="flex flex-col items-center gap-4 text-center mb-6">
+<div class="w-28 h-28 flex items-center justify-center mb-2">
+<img alt="Car Hero Logo" class="w-full h-full object-contain drop-shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVsXhD6bmRDM1su0GGNGLO6YgiVum6TB3oD6AZ0rhAUMOMFWOe8w8aUBXnFAfxyyGwiN9Bb9jNO7jsJCVR-t8amwdY521sZrqx2aJ19zAWN2u6IZ0Asi-99qBkP47JLrMQvvm3OMBzZKm-LeTghic1srOlL2evmmqLHSAFuothkTqmMQBjDlrEj9cAEh00Oke_mHL5P9xWYBSuroDnveOJRXyoJZslF_fq7L9fjM4c_sbN1Mzg_V5kqq_--ltyxO3Q90CfLyhD1vA">
+</div>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-[#6a1b9a] tracking-tight">إنشاء حساب جديد</h2>
+</div>
+<form class="space-y-[24px] flex flex-col">
+<!-- Full Name -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm text-[#6a1b9a]">الاسم الكامل</label>
+<div class="relative flex items-center group">
+<i class="fa-solid fa-user absolute right-4 text-outline-variant group-focus-within:text-primary-container transition-colors"></i>
+<input class="w-full h-[56px] pl-[16px] pr-[48px] bg-white border border-[#E0D4F0] rounded-xl focus:border-[#8f5cb1] focus:ring-1 focus:ring-[#8f5cb1] outline-none transition-all font-body-md text-body-md text-on-surface placeholder:text-outline-variant" placeholder="أدخل اسمك الكامل" type="text">
+</div>
+</div>
+<!-- Syrian Phone -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm text-[#6a1b9a]">رقم الهاتف</label>
+<div class="flex items-center w-full h-[56px] bg-white border border-[#E0D4F0] rounded-xl overflow-hidden focus-within:border-[#8f5cb1] focus-within:ring-1 focus-within:ring-[#8f5cb1] transition-all group">
+<div class="flex items-center justify-center px-4 bg-surface/50 h-full border-l border-[#E0D4F0]">
+<span class="text-[20px] mr-2">🇸🇾</span>
+<span class="font-label-sm text-label-sm text-[#6a1b9a] dir-ltr">+963</span>
+</div>
+<input class="flex-1 h-full px-[16px] bg-transparent border-none focus:ring-0 outline-none font-body-md text-body-md text-on-surface placeholder:text-outline-variant text-left" dir="ltr" placeholder="9XX XXX XXX" type="tel">
+</div>
+</div>
+<!-- Password -->
+<div class="flex flex-col gap-2">
+<label class="font-label-sm text-label-sm text-[#6a1b9a]">كلمة المرور</label>
+<div class="relative flex items-center group">
+<i class="fa-solid fa-lock absolute right-4 text-outline-variant group-focus-within:text-primary-container transition-colors"></i>
+<input class="w-full h-[56px] pl-[48px] pr-[48px] bg-white border border-[#E0D4F0] rounded-xl focus:border-[#8f5cb1] focus:ring-1 focus:ring-[#8f5cb1] outline-none transition-all font-body-md text-body-md text-on-surface placeholder:text-outline-variant" id="passwordInput" placeholder="أدخل كلمة المرور" type="password">
+<button class="absolute left-4 w-[24px] h-[24px] flex items-center justify-center text-outline-variant hover:text-primary-container transition-colors focus:outline-none" onclick="togglePassword('passwordInput', 'passwordToggleIcon')" type="button">
+<i class="fa-solid fa-eye" id="passwordToggleIcon"></i>
+</button>
+</div>
+</div>
+<!-- Confirm Password -->
+<div class="flex flex-col gap-2 mb-4">
+<label class="font-label-sm text-label-sm text-[#6a1b9a]">تأكيد كلمة المرور</label>
+<div class="relative flex items-center group">
+<i class="fa-solid fa-lock absolute right-4 text-outline-variant group-focus-within:text-primary-container transition-colors"></i>
+<input class="w-full h-[56px] pl-[48px] pr-[48px] bg-white border border-[#E0D4F0] rounded-xl focus:border-[#8f5cb1] focus:ring-1 focus:ring-[#8f5cb1] outline-none transition-all font-body-md text-body-md text-on-surface placeholder:text-outline-variant" id="confirmPasswordInput" placeholder="أعد إدخال كلمة المرور" type="password">
+<button class="absolute left-4 w-[24px] h-[24px] flex items-center justify-center text-outline-variant hover:text-primary-container transition-colors focus:outline-none" onclick="togglePassword('confirmPasswordInput', 'confirmPasswordToggleIcon')" type="button">
+<i class="fa-solid fa-eye" id="confirmPasswordToggleIcon"></i>
+</button>
+</div>
+</div>
+<!-- Submit Button -->
+<div class="flex items-start gap-3 mt-4 px-1">
+<div class="flex items-center h-5">
+<input class="w-5 h-5 text-primary-container border-[#E0D4F0] rounded focus:ring-primary-container cursor-pointer transition-all" id="terms-checkbox" type="checkbox">
+</div>
+<label class="font-label-sm text-[13px] text-[#6a1b9a]/80 leading-tight cursor-pointer" for="terms-checkbox">
+    أوافق على 
+    <a class="text-primary font-bold hover:underline" href="#">الشروط والأحكام</a> 
+    و
+    <a class="text-primary font-bold hover:underline" href="#">سياسة الخصوصية</a>
+</label>
+</div><button class="w-full h-[56px] mt-6 bg-primary-container text-white rounded-xl font-title-md text-title-md flex items-center justify-center gap-2 hover:bg-primary shadow-lg shadow-primary-container/30 transition-all active:scale-[0.98] duration-200 relative overflow-hidden group" type="button">
+<span class="relative z-10">إنشاء حساب</span>
+<div class="absolute inset-0 bg-white/10 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-500 ease-in-out"></div>
+</button>
+<!-- Trust Note -->
+<div class="flex items-center justify-center gap-2 mt-4 text-[#6a1b9a]/80">
+<i class="fa-solid fa-shield-halved text-[16px]"></i>
+<span class="font-label-sm text-[13px]">بياناتك آمنة معنا</span>
+</div>
+</form>
+<!-- Footer Link -->
+<div class="mt-8 text-center animate-[fadeIn_0.6s_ease-out_0.4s_both]">
+<p class="font-body-md text-body-md text-[#6a1b9a]">
+                لديك حساب؟ 
+                <a class="font-bold hover:text-primary transition-colors ml-1 underline decoration-primary-container/50 underline-offset-4" href="#">تسجيل الدخول</a>
+</p>
+</div>
+</div>
+</main>
+<!-- Branding Footer -->
+
+<script>
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("fa-eye");
+                icon.classList.add("fa-eye-slash");
+            } else {
+                input.type = "password";
+                icon.classList.remove("fa-eye-slash");
+                icon.classList.add("fa-eye");
+            }
+        }
+    </script>
+<style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+
+</body></html>
+
+<!-- OTP Verification - Ultra Premium - Car Hero -->
+<!DOCTYPE html><html dir="rtl" lang="ar"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>تأكيد رقم الهاتف - Car Hero</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "secondary-container": "#e5c1ff",
+                "surface-dim": "#dcd8e2",
+                "surface-container-low": "#f6f2fc",
+                "primary-container": "#8f5cb1",
+                "on-tertiary-fixed": "#2f004b",
+                "outline": "#7e7480",
+                "surface-tint": "#7a489c",
+                "on-primary-fixed": "#2f004c",
+                "inverse-primary": "#e3b5ff",
+                "secondary": "#705288",
+                "surface-container-lowest": "#ffffff",
+                "on-primary": "#ffffff",
+                "on-tertiary-fixed-variant": "#6a1b9a",
+                "error": "#ba1a1a",
+                "on-secondary": "#ffffff",
+                "on-surface-variant": "#4c444f",
+                "on-error-container": "#93000a",
+                "primary": "#754396",
+                "on-surface": "#1b1b22",
+                "outline-variant": "#cfc3d1",
+                "on-tertiary-container": "#fff4fe",
+                "on-secondary-fixed": "#290d40",
+                "on-primary-fixed-variant": "#613082",
+                "on-secondary-container": "#694c81",
+                "inverse-surface": "#303037",
+                "tertiary-fixed-dim": "#e4b5ff",
+                "on-tertiary": "#ffffff",
+                "surface-bright": "#fcf8ff",
+                "surface-container-high": "#eae6f0",
+                "surface-container": "#f0ecf6",
+                "tertiary": "#7f34ae",
+                "secondary-fixed": "#f1daff",
+                "background": "#fcf8ff",
+                "on-background": "#1b1b22",
+                "primary-fixed-dim": "#e3b5ff",
+                "tertiary-container": "#994fc9",
+                "tertiary-fixed": "#f4d9ff",
+                "on-secondary-fixed-variant": "#573b6e",
+                "secondary-fixed-dim": "#dcb9f6",
+                "on-error": "#ffffff",
+                "on-primary-container": "#fff5fe",
+                "surface-variant": "#e4e1eb",
+                "error-container": "#ffdad6",
+                "surface-container-highest": "#e4e1eb",
+                "inverse-on-surface": "#f3eff9",
+                "primary-fixed": "#f4daff",
+                "surface": "#fcf8ff"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px",
+                "2xl": "1rem",
+                "3xl": "1.5rem",
+                "4xl": "2rem"
+        },
+        "spacing": {
+                "gutter": "16px",
+                "unit": "8px",
+                "touch-target-min": "48px",
+                "container-margin": "20px"
+        },
+        "fontFamily": {
+                "headline-lg": [
+                        "plusJakartaSans"
+                ],
+                "label-sm": [
+                        "plusJakartaSans"
+                ],
+                "title-md": [
+                        "plusJakartaSans"
+                ],
+                "body-md": [
+                        "plusJakartaSans"
+                ],
+                "body-lg": [
+                        "plusJakartaSans"
+                ],
+                "headline-lg-mobile": [
+                        "plusJakartaSans"
+                ],
+                "display-lg": [
+                        "plusJakartaSans"
+                ]
+        },
+        "fontSize": {
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "label-sm": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ],
+                "title-md": [
+                        "20px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "28px",
+                        {
+                                "lineHeight": "36px",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-lg": [
+                        "40px",
+                        {
+                                "lineHeight": "48px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        
+        .otp-input {
+            width: 48px;
+            height: 56px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 700;
+            border-radius: 12px;
+            background-color: #ffffff;
+            border: 1.5px solid #cfc3d1;
+            color: #1b1b22;
+            transition: all 0.2s ease-in-out;
+            outline: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+        
+        .otp-input:focus {
+            border-color: #8f5cb1;
+            box-shadow: 0 0 0 4px rgba(143, 92, 177, 0.1);
+            background-color: #ffffff;
+        }
+
+        .otp-input::-webkit-outer-spin-button,
+        .otp-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="from-surface-container to-surface-bright text-on-background min-h-screen flex flex-col justify-center items-center p-container-margin md:p-0 antialiased relative bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_var(--tw-gradient-to)_100%)]">
+<!-- Background Decorative Blur -->
+<div class="fixed top-[-10%] left-[-10%] w-[50%] h-[50%] bg-primary-container/20 rounded-full blur-[100px] pointer-events-none z-0"></div>
+<div class="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-secondary-container/30 rounded-full blur-[100px] pointer-events-none z-0"></div>
+<!-- Main Container -->
+<main class="w-full max-w-md mx-auto flex flex-col items-center bg-surface/85 backdrop-blur-xl rounded-3xl shadow-[0_8px_32px_rgba(117,67,150,0.08)] border border-white/40 p-8 relative overflow-hidden z-10">
+<!-- Back Button -->
+<div class="w-full flex justify-end mb-4 rtl">
+<button aria-label="العودة" class="p-2 rounded-full hover:bg-white/50 transition-colors active:scale-95 text-on-surface-variant flex items-center justify-center min-h-[48px] min-w-[48px]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_forward</span>
+</button>
+</div>
+<!-- Brand Logo -->
+<div class="w-20 h-20 mb-6 flex items-center justify-center">
+<img alt="Car Hero Logo" class="object-contain w-full h-full opacity-90" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAb4BCJiIaefSyRA57NVL9UwjmciYNLOlfQlKOBvLzoeUTn6OvMALXAdcnlbyfxNow1pkFuClpbOX376V0hs0F951PhmN-dPi1Ew14SV5_S5yZIjkjWiWJ4hOjV6hN6sg0uMiZ6AuqyAqABqck4SGpAZf9tKLMccfq7spodzbX2AVUN3ZcJAVQknEg-DdRZi2GHdZuaiKxd22-if7O6xfUIVLowqdspTuYkXbDFf_1Ud_u31_jWtkVaXGxIiEzl084qElVzbg-VMEA">
+</div>
+<!-- Typography: Header & Subtitle -->
+<div class="text-center w-full mb-8">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg text-primary tracking-tight mb-3">تأكيد رقم الهاتف</h1>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-[280px] mx-auto">
+                أدخل رمز التحقق المرسل إلى رقمك 
+                <span class="font-semibold block mt-1 dir-ltr text-on-background">+963 9XX XXX XXX</span>
+</p>
+</div>
+<!-- OTP Input Form -->
+<form class="w-full flex flex-col items-center gap-6 mb-4" id="otp-form">
+<!-- OTP Boxes -->
+<div class="flex flex-row-reverse gap-2 md:gap-3 w-full justify-center" dir="ltr">
+<input aria-label="Digit 1" autofocus="" class="otp-input" id="otp-1" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+<input aria-label="Digit 2" class="otp-input" id="otp-2" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+<input aria-label="Digit 3" class="otp-input" id="otp-3" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+<input aria-label="Digit 4" class="otp-input" id="otp-4" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+<input aria-label="Digit 5" class="otp-input" id="otp-5" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+<input aria-label="Digit 6" class="otp-input" id="otp-6" inputmode="numeric" maxlength="1" pattern="[0-9]*" type="text">
+</div>
+<!-- Resend Logic -->
+<div class="flex flex-col items-center gap-1 w-full text-center mt-2">
+<p class="font-body-md text-body-md text-on-surface-variant">لم يصلك الرمز؟</p>
+<div class="flex items-center gap-2 justify-center h-8">
+<!-- Timer -->
+<span class="font-label-sm text-label-sm text-outline flex items-center gap-1 hidden" id="timer-text">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+                        إعادة الإرسال خلال <span class="font-semibold ml-1" id="countdown">0</span> ثانية
+                    </span>
+<!-- Resend Button -->
+<button class="font-label-sm text-label-sm font-semibold text-primary-container hover:text-primary transition-colors min-h-[48px] px-2 active:scale-95" id="resend-btn" type="button">
+                        إعادة الإرسال الآن
+                    </button>
+</div>
+</div>
+<!-- Primary Action Button -->
+<button class="w-full h-[56px] rounded-xl bg-primary-container text-white font-title-md text-title-md shadow-lg shadow-primary-container/20 hover:bg-primary transition-all duration-200 active:scale-[0.98] mt-4 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:shadow-none group relative overflow-hidden" disabled="" id="verify-btn" type="submit">
+<span class="relative z-10 flex items-center gap-2">
+                    تأكيد
+                    <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">check_circle</span>
+</span>
+<div class="absolute inset-0 bg-white/10 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-500 ease-in-out z-0"></div>
+</button>
+</form>
+<!-- Security Note -->
+<div class="flex items-center justify-center gap-2 mt-4 p-3 rounded-xl bg-white/50 border border-white/60 w-full max-w-[320px] backdrop-blur-sm">
+<span class="material-symbols-outlined text-outline text-[20px]" style="font-variation-settings: 'FILL' 1;">security</span>
+<p class="font-label-sm text-label-sm text-on-surface-variant">لا تشارك رمز التحقق مع أي شخص.</p>
+</div>
+</main>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputs = document.querySelectorAll('.otp-input');
+            const verifyBtn = document.getElementById('verify-btn');
+            const timerText = document.getElementById('timer-text');
+            const resendBtn = document.getElementById('resend-btn');
+            const countdownEl = document.getElementById('countdown');
+            
+            // RTL OTP Logic
+            inputs.forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    // Allow only numbers
+                    e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                    
+                    // Move to next input
+                    if (e.target.value !== '') {
+                        if (index < inputs.length - 1) {
+                            inputs[index + 1].focus();
+                        }
+                    }
+                    
+                    checkCompletion();
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    // Move to previous input on backspace
+                    if (e.key === 'Backspace' && e.target.value === '') {
+                        if (index > 0) {
+                            inputs[index - 1].focus();
+                        }
+                    }
+                });
+                
+                // Select text on focus for easy replacement
+                input.addEventListener('focus', () => {
+                    input.select();
+                });
+            });
+
+            function checkCompletion() {
+                let allFilled = true;
+                inputs.forEach(input => {
+                    if (input.value === '') allFilled = false;
+                });
+                
+                verifyBtn.disabled = !allFilled;
+            }
+
+            // Simple Timer Logic
+            let timeLeft = 45;
+            const timerId = setInterval(() => {
+                timeLeft--;
+                countdownEl.textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerId);
+                    timerText.classList.add('hidden');
+                    resendBtn.classList.remove('hidden');
+                }
+            }, 1000);
+            
+            // Handle Resend
+            resendBtn.addEventListener('click', () => {
+                // Reset timer visually for demo
+                resendBtn.classList.add('hidden');
+                timerText.classList.remove('hidden');
+                countdownEl.textContent = "45";
+                
+                // Clear inputs
+                inputs.forEach(input => input.value = '');
+                inputs[0].focus();
+                checkCompletion();
+            });
+            
+            // Focus first input on load
+            setTimeout(() => inputs[0].focus(), 100);
+        });
+    </script>
+
+
+</body></html>

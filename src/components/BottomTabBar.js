@@ -1,56 +1,58 @@
+// ============================================================
+//  BottomTabBar — شريط التنقّل السفلي (بطاقة عائمة)
+//  مُوحّد مع نظام التصميم الحديث (theme/theme.js + أيقونات phosphor)
+//  التابات الخمسة الحديثة (تطابق isTabStep في App.js):
+//    home · services · orders · vehicles · account
+//  عقد الـ props: { current, onChange }
+//    current: "home" | "services" | "orders" | "vehicles" | "account"
+//    onChange: (id) => void   ← يستدعيها App.js لتبديل الـ step
+// ============================================================
+
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LIGHT_COLORS, DARK_COLORS } from "../theme/colors";
-import { t } from "../services/i18n";
+import { House, SquaresFour, ClipboardText, CarProfile, User } from "phosphor-react-native";
+import { colors, shadow } from "../theme/theme";
 
-export default function BottomTabBar({ lang = "ar", theme = "light", current, onChange }) {
+// الترتيب منطقيّ من اليمين لليسار (RTL) عبر flexDirection: row-reverse بالأسفل
+const TABS = [
+  { id: "home", label: "الرئيسية", Icon: House },
+  { id: "services", label: "الخدمات", Icon: SquaresFour },
+  { id: "orders", label: "الطلبات", Icon: ClipboardText },
+  { id: "vehicles", label: "المركبات", Icon: CarProfile },
+  { id: "account", label: "الحساب", Icon: User },
+];
+
+export default function BottomTabBar({ current, onChange }) {
   const insets = useSafeAreaInsets();
-  const colors = theme === "dark" ? DARK_COLORS : LIGHT_COLORS;
-  const isRtl = lang === "ar";
-
-  const TABS = [
-    { id: "home", label: t("tabHome", lang), icon: "🏠" },
-    { id: "orders", label: t("tabOrders", lang), icon: "📦" },
-    { id: "points", label: t("tabPoints", lang), icon: "⭐" },
-    { id: "chats", label: t("tabChats", lang), icon: "💬" },
-    { id: "profile", label: t("tabProfile", lang), icon: "👤" },
-  ];
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingBottom: Math.max(insets.bottom, 8),
-          flexDirection: isRtl ? "row-reverse" : "row",
-          backgroundColor: colors.navBg,
-          borderColor: colors.border,
-        },
-      ]}
-    >
-      {TABS.map((tab) => {
-        const active = current === tab.id;
+    <View style={[styles.container, { marginBottom: Math.max(insets.bottom, 12) }]}>
+      {TABS.map(({ id, label, Icon }) => {
+        const active = current === id;
+        const tone = active ? colors.primaryLight : "#a79fb3";
         return (
-          <TouchableOpacity
-            key={tab.id}
-            style={styles.tab}
-            onPress={() => onChange(tab.id)}
-            activeOpacity={0.85}
+          <Pressable
+            key={id}
+            style={({ pressed }) => [styles.tab, pressed && !active && { opacity: 0.6 }]}
+            onPress={() => onChange?.(id)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={label}
           >
-            <Text style={[styles.icon, active && styles.iconActive, { color: active ? colors.navActive : colors.navInactive }]}>
-              {tab.icon}
-            </Text>
+            {/* مؤشّر التبويب النشط أعلى العنصر */}
+            <View style={[styles.indicator, active && styles.indicatorOn]} />
+            <View style={[styles.iconWrap, active && styles.iconWrapOn]}>
+              <Icon size={22} weight={active ? "fill" : "regular"} color={tone} />
+            </View>
             <Text
-              style={[
-                styles.label,
-                active ? styles.labelActive : styles.labelInactive,
-                { color: active ? colors.navActive : colors.muted },
-              ]}
+              style={[styles.label, { color: tone, fontWeight: active ? "700" : "600" }]}
+              numberOfLines={1}
             >
-              {tab.label}
+              {label}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         );
       })}
     </View>
@@ -58,20 +60,34 @@ export default function BottomTabBar({ lang = "ar", theme = "light", current, on
 }
 
 const styles = StyleSheet.create({
+  // بطاقة عائمة ضمن التدفّق العادي — لا تُغطّي محتوى الشاشات
   container: {
-    borderTopWidth: 1,
-    paddingTop: 6,
-  },
-  tab: {
-    flex: 1,
+    flexDirection: "row-reverse",
+    marginHorizontal: 14,
+    marginTop: 6,
+    height: 66,
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    paddingHorizontal: 8,
+    paddingTop: 4,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    paddingVertical: 6,
+    ...shadow.soft,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 26,
+    elevation: 12,
   },
-  icon: { fontSize: 20, opacity: 0.7 },
-  iconActive: { opacity: 1 },
-  label: { fontSize: 11, fontWeight: "700" },
-  labelActive: { fontWeight: "900" },
-  labelInactive: { fontWeight: "700" },
+  // كل تبويب يأخذ حصّة متساوية → توزيع متناسق دائماً
+  tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3 },
+  indicator: {
+    width: 18,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: "transparent",
+    marginBottom: 2,
+  },
+  indicatorOn: { backgroundColor: colors.primaryLight },
+  iconWrap: { width: 46, height: 32, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  iconWrapOn: { backgroundColor: colors.tint },
+  label: { fontSize: 10.5 },
 });
