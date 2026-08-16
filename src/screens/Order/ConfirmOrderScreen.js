@@ -1,68 +1,58 @@
-// ============================================================
-//  ConfirmOrderScreen — ١٦ · تأكيد الطلب  (القسم E)
-//  السيارة من GET /vehicles/my · الموقع إحداثيات الجهاز [lng,lat]
-//  notes→وصف المشكلة · scheduleTime بمنتقي وقت فعلي عند الجدولة
-//  لا يُحسب السعر يدويًا — total يأتي من ردّ الطلب.
-// ============================================================
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
-  ArrowRight, CarProfile, MapPin, CaretLeft, CalendarCheck, Warning,
-  SteeringWheel, Check, Lightning, WarningCircle, Plus,
-} from 'phosphor-react-native';
-import { colors, radius, shadow, gradients } from '../../theme/theme';
-import { fetchMyVehicles, vehicleTitle, vehicleSub } from '../../services/vehiclesApi';
-import { getDeviceCoords } from '../../services/location';
+  CalendarCheck,
+  CarProfile,
+  Check,
+  Lightning,
+  MapPin,
+  Plus,
+  SteeringWheel,
+  Warning,
+} from "phosphor-react-native";
+import { AppHeader, EmptyState, PressableScale, PrimaryButton } from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { fetchMyVehicles, vehicleSub, vehicleTitle } from "../../services/vehiclesApi";
+import { getDeviceCoords } from "../../services/location";
 
-function Toggle({ value, onChange }) {
-  return (
-    <Pressable onPress={() => onChange?.(!value)} style={[t.track, value ? t.on : t.off]}>
-      <View style={[t.knob, value ? t.knobOn : t.knobOff]} />
-    </Pressable>
-  );
-}
-const t = StyleSheet.create({
-  track: { width: 44, height: 26, borderRadius: 999, justifyContent: 'center' },
-  on: { backgroundColor: colors.primaryLight },
-  off: { backgroundColor: '#e2d7ef' },
-  knob: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  knobOn: { left: 3 },
-  knobOff: { right: 3 },
-});
-
-const fmt = (n) => (n == null ? '' : Number(n).toLocaleString('ar-EG'));
-const fmtDate = (d) => d.toLocaleString('ar-EG', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+const formatNumber = (value) => (value == null ? "" : Number(value).toLocaleString("ar-EG"));
+const formatDate = (date) => date.toLocaleString("ar-EG", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
 export default function ConfirmOrderScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const { serviceId, serviceName, servicePrice, providerId, coords: coordsParam } = route?.params || {};
-
-  const [schedule, setSchedule] = useState(false);
+  const [scheduled, setScheduled] = useState(false);
   const [when, setWhen] = useState(new Date(Date.now() + 60 * 60 * 1000));
   const [showPicker, setShowPicker] = useState(false);
-  const [status, setStatus] = useState('broken');
-  const [notes, setNotes] = useState('');
-
+  const [pickerMode, setPickerMode] = useState(Platform.OS === "android" ? "date" : "datetime");
+  const [carState, setCarState] = useState("broken");
+  const [notes, setNotes] = useState("");
+  const [notesFocused, setNotesFocused] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [vehicleId, setVehicleId] = useState(null);
   const [coords, setCoords] = useState(coordsParam || null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError("");
     try {
-      const [vs, c] = await Promise.all([
+      const [vehicleList, currentCoords] = await Promise.all([
         fetchMyVehicles(),
         coordsParam ? Promise.resolve(coordsParam) : getDeviceCoords(),
       ]);
-      setVehicles(vs);
-      setVehicleId(vs[0]?.id ?? null);
-      setCoords(c);
-    } catch (e) {
-      setError(e?.message || 'تعذّر تحضير بيانات الطلب');
+      const list = Array.isArray(vehicleList) ? vehicleList : [];
+      const defaultVehicle = list.find((vehicle) => vehicle.isDefault) || list[0];
+      setVehicles(list);
+      setVehicleId(defaultVehicle?.id || defaultVehicle?._id || null);
+      setCoords(currentCoords);
+    } catch (loadError) {
+      setError(loadError?.message || "تعذر تحضير بيانات الطلب");
     } finally {
       setLoading(false);
     }
@@ -70,180 +60,321 @@ export default function ConfirmOrderScreen({ navigation, route }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const statusLabel = status === 'broken' ? 'السيارة متعطّلة تمامًا' : 'السيارة قادرة على الحركة';
+  const refreshLocation = async () => {
+    setLocationLoading(true);
+    try {
+      setCoords(await getDeviceCoords());
+    } catch (locationError) {
+      setError(locationError?.message || "تعذر تحديد الموقع الحالي");
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
+  const canSubmit = !!serviceId && Number.isFinite(coords?.longitude) && Number.isFinite(coords?.latitude);
+  const carStateLabel = carState === "broken" ? "السيارة متعطلة تماماً" : "السيارة قادرة على الحركة";
+
+  const openSchedulePicker = () => {
+    setPickerMode(Platform.OS === "android" ? "date" : "datetime");
+    setShowPicker(true);
+  };
+
+  const handlePickerChange = (event, value) => {
+    if (event?.type === "dismissed" || !value) {
+      setShowPicker(false);
+      return;
+    }
+    setWhen(value);
+    if (Platform.OS === "android" && pickerMode === "date") {
+      setShowPicker(false);
+      setPickerMode("time");
+      setTimeout(() => setShowPicker(true), 0);
+      return;
+    }
+    if (Platform.OS !== "ios") setShowPicker(false);
+  };
+
+  // طلب مكرّر هنا يعني خصماً مزدوجاً وشكوى: الحارس المرجعي يمنع مرور نقرة
+  // ثانية قبل أن تكتمل عملية التنقّل (تعطيل الزر وحده غير كافٍ لأنه يعتمد
+  // على إعادة رسم غير متزامنة).
+  const submittingRef = useRef(false);
   const submit = () => {
-    const composedNotes = [statusLabel, notes.trim()].filter(Boolean).join(' — ');
-    navigation?.navigate?.('SearchingProvider', {
+    if (!canSubmit || submittingRef.current) return;
+    submittingRef.current = true;
+    setTimeout(() => { submittingRef.current = false; }, 1500);
+    const composedNotes = [carStateLabel, notes.trim()].filter(Boolean).join(" - ");
+    navigation?.navigate?.("SearchingProvider", {
       serviceId,
       serviceName,
       providerId: providerId || undefined,
       vehicleId: vehicleId || undefined,
       notes: composedNotes || undefined,
-      scheduleTime: schedule ? when.toISOString() : undefined,
-      longitude: coords?.longitude,
-      latitude: coords?.latitude,
+      scheduleTime: scheduled ? when.toISOString() : undefined,
+      longitude: coords.longitude,
+      latitude: coords.latitude,
     });
   };
 
-  if (loading) {
-    return <View style={[s.root, s.center]}><ActivityIndicator color={colors.primary} /><Text style={s.stateText}>جارٍ التحضير…</Text></View>;
-  }
-  if (error) {
-    return (
-      <View style={[s.root, s.center]}>
-        <WarningCircle size={44} weight="fill" color={colors.danger} />
-        <Text style={s.stateText}>{error}</Text>
-        <Pressable style={s.retry} onPress={load}><Text style={s.retryText}>إعادة المحاولة</Text></Pressable>
-      </View>
-    );
-  }
-
   return (
-    <View style={s.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 52, paddingBottom: 110 }}>
-        <View style={s.head}>
-          <Pressable style={s.back} onPress={() => navigation?.goBack?.()}><ArrowRight size={20} color={colors.textHeading} /></Pressable>
-          <Text style={s.headTitle}>تأكيد الطلب</Text>
-        </View>
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + 112 }]}
+      >
+        <AppHeader title="تأكيد الطلب" subtitle="راجع التفاصيل قبل الإرسال" onBack={() => navigation?.goBack?.()} />
 
-        {serviceName ? (
-          <View style={s.serviceChip}>
-            <Lightning size={16} weight="fill" color={colors.primary} />
-            <Text style={s.serviceChipText}>{serviceName}{servicePrice ? ` · يبدأ من ${fmt(servicePrice)} ل.س` : ''}</Text>
-          </View>
-        ) : null}
-
-        {/* السيارة */}
-        <Text style={s.label}>السيارة</Text>
-        {vehicles.length === 0 ? (
-          <Pressable style={s.addVehicle} onPress={() => navigation?.navigate?.('AddVehicle')}>
-            <Plus size={18} weight="bold" color={colors.primary} />
-            <Text style={s.addVehicleText}>أضِف مركبة (اختياري)</Text>
-          </Pressable>
+        {loading ? (
+          <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>جاري تجهيز الطلب...</Text></View>
+        ) : error && !coords ? (
+          <EmptyState title="تعذر تجهيز الطلب" message={error} actionLabel="إعادة المحاولة" onAction={load} />
         ) : (
-          vehicles.map((v) => {
-            const on = v.id === vehicleId;
-            return (
-              <Pressable key={v.id} onPress={() => setVehicleId(on ? null : v.id)} style={[s.rowCard, on && s.rowCardOn]}>
-                <View style={s.rowIcon}><CarProfile size={22} weight="fill" color={colors.primaryLight} /></View>
-                <View style={{ flex: 1 }}><Text style={s.rowTitle}>{vehicleTitle(v)}</Text><Text style={s.rowSub}>{vehicleSub(v)}</Text></View>
-                {on ? <View style={s.radioOn}><Check size={13} weight="bold" color="#fff" /></View> : <CaretLeft size={16} color="#a79fb3" />}
-              </Pressable>
-            );
-          })
+          <>
+            <View style={styles.summary}>
+              <View style={styles.summaryIcon}><Lightning size={23} weight="fill" color={colors.primary} /></View>
+              <View style={styles.summaryCopy}>
+                <Text style={styles.summaryTitle}>{serviceName || "الخدمة المطلوبة"}</Text>
+                <Text style={styles.summaryPrice}>{servicePrice ? `يبدأ من ${formatNumber(servicePrice)} ل.س` : "السعر النهائي يحدد حسب الحالة"}</Text>
+              </View>
+            </View>
+
+            {/* تفصيل السعر قبل التأكيد: المفاجأة السعرية بعد الالتزام أسوأ من
+                سعر مرتفع معلن، وهي السبب الأول للإلغاء وفقدان الثقة. */}
+            <View style={styles.priceBreakdown}>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>سعر الخدمة الابتدائي</Text>
+                <Text style={styles.priceValue}>
+                  {servicePrice ? `${formatNumber(servicePrice)} ل.س` : "حسب الحالة"}
+                </Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>رسوم الوصول</Text>
+                <Text style={styles.priceValue}>تُحتسب حسب المسافة</Text>
+              </View>
+              <View style={styles.priceDivider} />
+              <View style={styles.priceRow}>
+                <Text style={styles.priceTotalLabel}>الإجمالي المتوقّع</Text>
+                <Text style={styles.priceTotalValue}>
+                  {servicePrice ? `من ${formatNumber(servicePrice)} ل.س` : "يحدَّد بعد الفحص"}
+                </Text>
+              </View>
+              <Text style={styles.priceNote}>
+                قد يتغيّر الإجمالي إن لزمت قطع غيار أو تعذّر الإصلاح موقعياً. يبلغك الفني
+                بأي فرق قبل تنفيذه.
+              </Text>
+            </View>
+
+            <SectionLabel title="المركبة" helper="اختياري" />
+            {vehicles.length === 0 ? (
+              <PressableScale style={styles.addVehicle} onPress={() => navigation?.navigate?.("AddVehicle")} accessibilityRole="button">
+                <Plus size={18} weight="bold" color={colors.primary} />
+                <Text style={styles.addVehicleText}>إضافة مركبة لتسريع الطلب</Text>
+              </PressableScale>
+            ) : (
+              <View style={styles.vehicleList}>
+                {vehicles.map((vehicle) => {
+                  const id = vehicle.id || vehicle._id;
+                  const selected = id === vehicleId;
+                  return (
+                    <PressableScale
+                      key={id}
+                      onPress={() => setVehicleId(selected ? null : id)}
+                      style={[styles.selectRow, selected && styles.selectRowActive]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                    >
+                      <View style={styles.rowIcon}><CarProfile size={22} weight="fill" color={colors.primary} /></View>
+                      <View style={styles.rowCopy}>
+                        <Text style={styles.rowTitle} numberOfLines={1}>{vehicleTitle(vehicle)}</Text>
+                        <Text style={styles.rowSubtitle} numberOfLines={1}>{vehicleSub(vehicle)}</Text>
+                      </View>
+                      <View style={[styles.radio, selected && styles.radioActive]}>{selected ? <Check size={13} weight="bold" color={colors.onPrimary} /> : null}</View>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+            )}
+
+            <SectionLabel title="موقع الخدمة" />
+            <View style={styles.locationRow}>
+              <View style={[styles.rowIcon, styles.locationIcon]}><MapPin size={22} weight="fill" color={colors.secondary} /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle}>{coords ? "تم تحديد موقعك الحالي" : "الموقع غير متاح"}</Text>
+                <Text style={styles.rowSubtitle}>{coords ? "سيُرسل الموقع الدقيق للفني عند التأكيد" : "فعّل إذن الموقع ثم أعد المحاولة"}</Text>
+              </View>
+              <PressableScale style={styles.refreshLocation} onPress={refreshLocation} disabled={locationLoading} accessibilityRole="button" accessibilityLabel="تحديث الموقع">
+                {locationLoading ? <ActivityIndicator size="small" color={colors.secondary} /> : <Text style={styles.refreshText}>تحديث</Text>}
+              </PressableScale>
+            </View>
+            {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+
+            <SectionLabel title="موعد الخدمة" />
+            <View style={styles.toggleRow}>
+              <View style={[styles.rowIcon, styles.scheduleIcon]}><CalendarCheck size={21} weight="fill" color={colors.info} /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.rowTitle}>جدولة لوقت لاحق</Text>
+                <Text style={styles.rowSubtitle}>{scheduled ? formatDate(when) : "طلب الخدمة الآن"}</Text>
+              </View>
+              <Switch
+                value={scheduled}
+                onValueChange={(value) => {
+                  setScheduled(value);
+                  if (value) openSchedulePicker();
+                }}
+                trackColor={{ false: colors.borderInput, true: colors.primarySoft }}
+                thumbColor={scheduled ? colors.primary : colors.surface}
+                accessibilityLabel="جدولة الخدمة لوقت لاحق"
+              />
+            </View>
+            {scheduled ? (
+              <PressableScale style={styles.dateButton} onPress={openSchedulePicker} accessibilityRole="button">
+                <CalendarCheck size={18} color={colors.primary} />
+                <Text style={styles.dateButtonText}>{formatDate(when)}</Text>
+              </PressableScale>
+            ) : null}
+            {showPicker ? (
+              <DateTimePicker
+                value={when}
+                mode={pickerMode}
+                minimumDate={new Date()}
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={handlePickerChange}
+              />
+            ) : null}
+
+            <SectionLabel title="حالة السيارة" />
+            <View style={styles.stateOptions}>
+              <StateOption selected={carState === "broken"} Icon={Warning} label="متعطلة تماماً" onPress={() => setCarState("broken")} />
+              <StateOption selected={carState === "movable"} Icon={SteeringWheel} label="قادرة على الحركة" onPress={() => setCarState("movable")} />
+            </View>
+
+            <SectionLabel title="ملاحظات للفني" helper="اختياري" />
+            <View style={[styles.notes, notesFocused && styles.notesFocused]}>
+              <TextInput
+                value={notes}
+                onChangeText={setNotes}
+                onFocus={() => setNotesFocused(true)}
+                onBlur={() => setNotesFocused(false)}
+                placeholder="صف المشكلة أو اذكر معلومة تساعد الفني..."
+                placeholderTextColor={colors.textMuted2}
+                multiline
+                maxLength={500}
+                textAlign="right"
+                textAlignVertical="top"
+                accessibilityLabel="ملاحظات للفني"
+                style={styles.notesInput}
+              />
+              <Text style={styles.characterCount}>{notes.length} / 500</Text>
+            </View>
+          </>
         )}
-
-        {/* الموقع */}
-        <Text style={s.label}>موقع الخدمة</Text>
-        <View style={s.rowCard}>
-          <View style={s.rowIcon}><MapPin size={22} weight="fill" color={colors.primaryLight} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.rowTitle}>موقعي الحالي</Text>
-            <Text style={s.rowSub}>{coords ? `${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)}` : 'غير متاح'}</Text>
-          </View>
-        </View>
-
-        {/* جدولة */}
-        <View style={[s.rowCard, { marginTop: 16 }]}>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, flex: 1 }}>
-            <CalendarCheck size={20} weight="fill" color={colors.primaryLight} />
-            <Text style={s.toggleLabel}>جدولة لوقت لاحق</Text>
-          </View>
-          <Toggle value={schedule} onChange={(v) => { setSchedule(v); if (v && Platform.OS === 'android') setShowPicker(true); }} />
-        </View>
-        {schedule && (
-          <Pressable style={s.timeBtn} onPress={() => setShowPicker(true)}>
-            <CalendarCheck size={18} weight="fill" color={colors.primary} />
-            <Text style={s.timeBtnText}>{fmtDate(when)}</Text>
-          </Pressable>
-        )}
-        {schedule && showPicker && (
-          <DateTimePicker
-            value={when}
-            mode="datetime"
-            minimumDate={new Date()}
-            onChange={(e, d) => { setShowPicker(Platform.OS === 'ios'); if (d) setWhen(d); }}
-          />
-        )}
-
-        {/* حالة السيارة */}
-        <Text style={s.label}>حالة السيارة</Text>
-        <View style={{ flexDirection: 'row-reverse', gap: 10, marginBottom: 16 }}>
-          <Pressable style={[s.statusCard, status === 'broken' && s.statusOn]} onPress={() => setStatus('broken')}>
-            <Warning size={22} weight="fill" color={status === 'broken' ? colors.primaryLight : '#a79fb3'} />
-            <Text style={[s.statusText, status === 'broken' && s.statusTextOn]}>متعطّلة تمامًا</Text>
-          </Pressable>
-          <Pressable style={[s.statusCard, status === 'movable' && s.statusOn]} onPress={() => setStatus('movable')}>
-            <SteeringWheel size={22} color={status === 'movable' ? colors.primaryLight : '#a79fb3'} />
-            <Text style={[s.statusText, status === 'movable' && s.statusTextOn]}>قادرة على الحركة</Text>
-          </Pressable>
-        </View>
-
-        {/* وصف المشكلة → notes */}
-        <Text style={s.label}>وصف المشكلة</Text>
-        <View style={s.textArea}>
-          <TextInput value={notes} onChangeText={setNotes} placeholder="اشرح المشكلة باختصار…" placeholderTextColor={colors.textMuted2} multiline textAlign="right" style={s.textInput} />
-        </View>
-
-        <View style={s.noteBox}>
-          <Text style={s.noteText}>يُحتسب السعر النهائي ويظهر فور تأكيد الطلب وإسناد الفني.</Text>
-        </View>
       </ScrollView>
 
-      <View style={s.bottom}>
-        <Pressable onPress={submit} style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}>
-          <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.cta, shadow.button]}>
-            <Lightning size={18} weight="fill" color="#fff" />
-            <Text style={s.ctaText}>{schedule ? 'تأكيد الحجز' : 'اطلب المساعدة الآن'}</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+      {!loading && (!error || coords) ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+          {/* الزر يقول ما سيحدث وبكم: «تأكيد الطلب · ١٥٠ ل.س» لا «التالي».
+              ذكر النتيجة والسعر في الزر يقلّل التردد والإلغاء اللاحق. */}
+          <PrimaryButton
+            label={
+              scheduled
+                ? "تأكيد الحجز"
+                : servicePrice
+                  ? `تأكيد الطلب · من ${formatNumber(servicePrice)} ل.س`
+                  : "تأكيد الطلب"
+            }
+            icon={<Lightning size={18} weight="fill" color={colors.onPrimary} />}
+            onPress={submit}
+            disabled={!canSubmit}
+            accessibilityHint={!canSubmit ? "حدّد موقع الخدمة أولاً لتفعيل التأكيد" : undefined}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f3fa' },
-  center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 30 },
-  stateText: { fontSize: 14, color: colors.textBody, textAlign: 'center' },
-  retry: { marginTop: 4, backgroundColor: colors.tint, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 22 },
-  retryText: { fontSize: 13.5, fontWeight: '700', color: colors.primary },
+function SectionLabel({ title, helper }) {
+  return (
+    <View style={styles.sectionLabel}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {helper ? <Text style={styles.sectionHelper}>{helper}</Text> : null}
+    </View>
+  );
+}
 
-  head: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 20 },
-  back: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.soft, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14 },
-  headTitle: { fontSize: 19, fontWeight: '700', color: colors.textDark },
+function StateOption({ selected, Icon, label, onPress }) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      feedback={selected ? false : "selection"}
+      style={[styles.stateOption, selected && styles.stateOptionActive]}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected }}
+    >
+      <Icon size={21} weight="fill" color={selected ? colors.primary : colors.textMuted} />
+      <Text style={[styles.stateOptionText, selected && styles.stateOptionTextActive]}>{label}</Text>
+    </PressableScale>
+  );
+}
 
-  serviceChip: { flexDirection: 'row-reverse', alignItems: 'center', gap: 7, alignSelf: 'flex-end', backgroundColor: colors.tint, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14, marginBottom: 18 },
-  serviceChipText: { fontSize: 12.5, fontWeight: '700', color: colors.primary },
-
-  label: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginBottom: 8, marginTop: 4, textAlign: 'right' },
-  rowCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 13, marginBottom: 12 },
-  rowCardOn: { borderWidth: 1.5, borderColor: colors.primaryLight },
-  rowIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  rowSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, textAlign: 'right' },
-  toggleLabel: { fontSize: 14, fontWeight: '600', color: '#4a4358' },
-  radioOn: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-
-  addVehicle: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tint, borderRadius: 16, paddingVertical: 15, marginBottom: 12 },
-  addVehicleText: { fontSize: 13.5, fontWeight: '700', color: colors.primary },
-
-  timeBtn: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderWidth: 1.5, borderColor: colors.primaryLight, borderRadius: 14, padding: 13, marginBottom: 16 },
-  timeBtnText: { fontSize: 13.5, fontWeight: '700', color: colors.textDark },
-
-  statusCard: { flex: 1, alignItems: 'center', gap: 6, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 15, paddingVertical: 13, paddingHorizontal: 8 },
-  statusOn: { borderWidth: 1.5, borderColor: colors.primaryLight },
-  statusText: { fontSize: 12.5, fontWeight: '600', color: colors.textMuted },
-  statusTextOn: { color: colors.textDark, fontWeight: '700' },
-
-  textArea: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 13, height: 90, marginBottom: 14 },
-  textInput: { flex: 1, fontSize: 13, color: '#2a2333', textAlignVertical: 'top', padding: 0 },
-
-  noteBox: { backgroundColor: colors.tint, borderRadius: 14, padding: 13 },
-  noteText: { fontSize: 12.5, color: colors.primary, lineHeight: 21, textAlign: 'right' },
-
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 14, paddingBottom: 24, backgroundColor: '#f6f3fa' },
-  cta: { height: 56, borderRadius: radius.lg, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: { width: "100%", maxWidth: layout.contentMaxWidth, alignSelf: "center", paddingHorizontal: spacing.screenH },
+  loading: { minHeight: 300, alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  stateText: { color: colors.textMuted, fontSize: font.size.sm, textAlign: "center" },
+  summary: { minHeight: 76, flexDirection: "row-reverse", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md, marginTop: spacing.lg },
+  summaryIcon: { width: 44, height: 44, flexShrink: 0, borderRadius: radius.sm, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center" },
+  summaryCopy: { flex: 1, minWidth: 0 },
+  summaryTitle: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  summaryPrice: { fontSize: font.size.xs, color: colors.textMuted, marginTop: 1, textAlign: "right" },
+  sectionLabel: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, marginTop: spacing.xl, marginBottom: spacing.sm },
+  sectionTitle: { fontSize: font.size.xs, fontWeight: "700", color: colors.textHeading, textAlign: "right" },
+  sectionHelper: { fontSize: font.size.xxs, color: colors.textMuted },
+  vehicleList: { gap: spacing.sm },
+  selectRow: { minHeight: 68, flexDirection: "row-reverse", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md },
+  selectRowActive: { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: "#FCFAFD" },
+  rowIcon: { width: 40, height: 40, flexShrink: 0, borderRadius: radius.sm, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center" },
+  rowCopy: { flex: 1, minWidth: 0 },
+  rowTitle: { fontSize: font.size.sm, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  rowSubtitle: { fontSize: font.size.xxs, color: colors.textMuted, marginTop: 1, textAlign: "right" },
+  radio: { width: 22, height: 22, flexShrink: 0, borderRadius: 11, borderWidth: 1.5, borderColor: colors.borderInput, alignItems: "center", justifyContent: "center" },
+  radioActive: { borderColor: colors.primary, backgroundColor: colors.primary },
+  addVehicle: { minHeight: 52, flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primarySoft, borderRadius: radius.card, backgroundColor: colors.tint },
+  addVehicleText: { fontSize: font.size.sm, fontWeight: "700", color: colors.primary },
+  locationRow: { minHeight: 74, flexDirection: "row-reverse", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md },
+  locationIcon: { backgroundColor: colors.secondarySoft },
+  // 44 = الحد الأدنى لهدف اللمس (كان 38)
+  refreshLocation: { minHeight: layout.touchTarget, minWidth: 64, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.sm, backgroundColor: colors.secondarySoft },
+  refreshText: { fontSize: font.size.xxs, fontWeight: "700", color: colors.secondary },
+  inlineError: { marginTop: spacing.xs, color: colors.danger, fontSize: font.size.xxs, textAlign: "right" },
+  toggleRow: { minHeight: 74, flexDirection: "row-reverse", alignItems: "center", gap: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md },
+  scheduleIcon: { backgroundColor: colors.infoBg },
+  dateButton: { minHeight: 48, flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1, borderColor: colors.primarySoft, borderRadius: radius.card, backgroundColor: colors.tint, marginTop: spacing.sm },
+  dateButtonText: { fontSize: font.size.xs, fontWeight: "700", color: colors.primary, textAlign: "center" },
+  stateOptions: { flexDirection: "row-reverse", gap: spacing.sm },
+  stateOption: { flex: 1, minHeight: 60, flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: spacing.sm, borderWidth: 1, borderColor: colors.borderInput, borderRadius: radius.card, backgroundColor: colors.surface, paddingHorizontal: spacing.sm },
+  stateOptionActive: { borderColor: colors.primary, backgroundColor: colors.tint },
+  stateOptionText: { flexShrink: 1, fontSize: font.size.xs, fontWeight: "600", color: colors.textMuted, textAlign: "center" },
+  stateOptionTextActive: { color: colors.primary, fontWeight: "700" },
+  notes: { minHeight: 116, borderWidth: 1, borderColor: colors.borderInput, borderRadius: radius.card, backgroundColor: colors.surface, padding: spacing.md },
+  notesFocused: { borderColor: colors.primary, borderWidth: 1.5 },
+  notesInput: { minHeight: 72, fontFamily: font.family, fontSize: font.size.sm, color: colors.textDark, padding: 0, outlineStyle: "none" },
+  characterCount: { alignSelf: "flex-start", fontSize: font.size.xxs, color: colors.textMuted },
+  priceBreakdown: {
+    marginTop: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  priceRow: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  priceLabel: { fontSize: font.size.sm, color: colors.textBody, textAlign: "right" },
+  priceValue: { fontSize: font.size.sm, color: colors.textDark, fontWeight: "600" },
+  priceDivider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: 2 },
+  priceTotalLabel: { fontSize: font.size.sm, fontWeight: "700", color: colors.textDark },
+  priceTotalValue: { fontSize: font.size.body, fontWeight: "700", color: colors.primary },
+  priceNote: { fontSize: font.size.xxs, color: colors.textMuted, lineHeight: 18, textAlign: "right" },
+  footer: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.screenH, paddingTop: spacing.md },
 });

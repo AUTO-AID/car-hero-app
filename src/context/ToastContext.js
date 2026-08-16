@@ -3,17 +3,19 @@
 //  الاستخدام: const toast = useToast(); toast.success('...');
 // ============================================================
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { Animated, StyleSheet, Text, View, Platform } from 'react-native';
+import { Animated, StyleSheet, View, Platform } from 'react-native';
+import Text from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle, WarningCircle, Info } from 'phosphor-react-native';
 import { colors, shadow } from '../theme/theme';
+import { errorFeedback, successFeedback } from '../services/feedback';
 
 const ToastContext = createContext(null);
 
 const TONE = {
-  success: { bg: '#e6f7ef', border: '#3bb57e', text: '#1c7a53', Icon: CheckCircle },
-  error: { bg: colors.dangerBg, border: '#e05561', text: '#c0303c', Icon: WarningCircle },
-  info: { bg: colors.tint, border: colors.primaryLight, text: colors.primary, Icon: Info },
+  success: { bg: colors.successBg, border: colors.success, text: colors.success, Icon: CheckCircle },
+  error: { bg: colors.dangerBg, border: colors.danger, text: colors.danger, Icon: WarningCircle },
+  info: { bg: colors.infoBg, border: colors.info, text: colors.info, Icon: Info },
 };
 
 export function ToastProvider({ children }) {
@@ -30,6 +32,8 @@ export function ToastProvider({ children }) {
 
   const show = useCallback((message, type = 'info', duration = 2800) => {
     if (!message) return;
+    if (type === 'success') successFeedback();
+    if (type === 'error') errorFeedback();
     if (hideTimer.current) clearTimeout(hideTimer.current);
     setToast({ message, type });
     anim.setValue(0);
@@ -55,6 +59,8 @@ export function ToastProvider({ children }) {
       {toast && (
         <Animated.View
           pointerEvents="none"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
           style={[
             s.wrap,
             { top: insets.top + 8 },
@@ -97,8 +103,8 @@ const s = StyleSheet.create({
     width: '100%',
     paddingVertical: 13,
     paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    borderRadius: 8,
+    borderWidth: 1,
     ...shadow.card,
   },
   text: { flex: 1, fontSize: 13.5, fontWeight: '700', textAlign: 'right' },

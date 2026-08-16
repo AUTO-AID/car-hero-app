@@ -1,0 +1,483 @@
+Starting project at E:\all_project\CarHero\newapp2\carApp
+Starting Metro Bundler
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Web .\index.js ▓▓▓▓▓▓░░░░░░░░░░ 39.6% (17/27)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% (142/214)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 79.0% (384/432)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.0% ( 958/2485)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.0% (1715/3242)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 93.0% (2694/3521)
+Web Bundled 23069ms index.js (3521 modules)
+ LOG  [web] Logs will appear in the browser console
+Unable to resolve "../theme/theme" from "src\context\ToastContext.js"
+[0m [90m  7 |[39m [36mimport[39m { useSafeAreaInsets } [36mfrom[39m [32m'react-native-safe-area-context'[39m[33m;[39m
+ [90m  8 |[39m [36mimport[39m { [33mCheckCircle[39m[33m,[39m [33mWarningCircle[39m[33m,[39m [33mInfo[39m } [36mfrom[39m [32m'phosphor-react-native'[39m[33m;[39m
+[31m[1m>[22m[39m[90m  9 |[39m [36mimport[39m { colors[33m,[39m shadow } [36mfrom[39m [32m'../theme/theme'[39m[33m;[39m
+ [90m    |[39m                                 [31m[1m^[22m[39m
+ [90m 10 |[39m
+ [90m 11 |[39m [36mconst[39m [33mToastContext[39m [33m=[39m createContext([36mnull[39m)[33m;[39m
+ [90m 12 |[39m[0m
+
+Import stack:
+
+ src\context\ToastContext.js
+ | import "../theme/theme"
+
+ App.js
+ | import "./src/context/ToastContext"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "../../components/ui" from "src\screens\Auth\RegisterScreen.js"
+[0m [90m  9 |[39m [36mimport[39m { [33mUser[39m[33m,[39m [33mLockSimple[39m[33m,[39m [33mUserCirclePlus[39m[33m,[39m [33mCheck[39m[33m,[39m [33mShieldCheck[39m } [36mfrom[39m [32m'phosphor-react-native'[39m[33m;[39m
+ [90m 10 |[39m [36mimport[39m { colors[33m,[39m shadow[33m,[39m gradients } [36mfrom[39m [32m'../../theme/theme'[39m[33m;[39m
+[31m[1m>[22m[39m[90m 11 |[39m [36mimport[39m { [33mInputField[39m[33m,[39m [33mPhoneField[39m[33m,[39m [33mPrimaryButton[39m[33m,[39m [33mLinkText[39m[33m,[39m [33mErrorBanner[39m } [36mfrom[39m [32m'../../components/ui'[39m[33m;[39m
+ [90m    |[39m                                                                               [31m[1m^[22m[39m
+ [90m 12 |[39m [36mimport[39m { isStrongPassword } [36mfrom[39m [32m'../../services/validators'[39m[33m;[39m
+ [90m 13 |[39m
+ [90m 14 |[39m [36mexport[39m [36mdefault[39m [36mfunction[39m [33mRegisterScreen[39m({ onSubmit[33m,[39m onLogin[33m,[39m loading [33m=[39m [36mfalse[39m[33m,[39m error [33m=[39m [32m''[39m }) {[0m
+
+Import stack:
+
+ src\screens\Auth\RegisterScreen.js
+ | import "../../components/ui"
+
+ App.js
+ | import "./src/screens/Auth/RegisterScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Main/HomeScreen" from "App.js"
+[0m [90m 19 |[39m [36mimport[39m [33mLocationPermissionScreen[39m [36mfrom[39m [32m"./src/screens/Main/LocationPermissionScreen"[39m[33m;[39m
+ [90m 20 |[39m
+[31m[1m>[22m[39m[90m 21 |[39m [36mimport[39m [33mHomeScreen[39m [36mfrom[39m [32m"./src/screens/Main/HomeScreen"[39m[33m;[39m
+ [90m    |[39m                         [31m[1m^[22m[39m
+ [90m 22 |[39m [36mimport[39m [33mInteractiveMapScreen[39m [36mfrom[39m [32m"./src/screens/Main/InteractiveMapScreen"[39m[33m;[39m
+ [90m 23 |[39m
+ [90m 24 |[39m [90m// القسم E + F — تدفّق الطلب والتتبّع والإتمام[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Main/HomeScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/ServiceCatalogScreen" from "App.js"
+[0m [90m 23 |[39m
+ [90m 24 |[39m [90m// القسم E + F — تدفّق الطلب والتتبّع والإتمام[39m
+[31m[1m>[22m[39m[90m 25 |[39m [36mimport[39m [33mServiceCatalogScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceCatalogScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 26 |[39m [36mimport[39m [33mServiceDetailScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceDetailScreen"[39m[33m;[39m
+ [90m 27 |[39m [36mimport[39m [33mConfirmOrderScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmOrderScreen"[39m[33m;[39m
+ [90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/ServiceCatalogScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/OrdersListScreen" from "App.js"
+[0m [90m 34 |[39m
+ [90m 35 |[39m [90m// القسم G — الطلبات والحجوزات[39m
+[31m[1m>[22m[39m[90m 36 |[39m [36mimport[39m [33mOrdersListScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrdersListScreen"[39m[33m;[39m
+ [90m    |[39m                               [31m[1m^[22m[39m
+ [90m 37 |[39m [36mimport[39m [33mOrderDetailScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrderDetailScreen"[39m[33m;[39m
+ [90m 38 |[39m [36mimport[39m [33mBookingScreenNew[39m [36mfrom[39m [32m"./src/screens/Order/BookingScreen"[39m[33m;[39m
+ [90m 39 |[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/OrdersListScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Vehicle/VehiclesListScreen" from "App.js"
+[0m [90m 39 |[39m
+ [90m 40 |[39m [90m// القسم H — المركبات[39m
+[31m[1m>[22m[39m[90m 41 |[39m [36mimport[39m [33mVehiclesListScreen[39m [36mfrom[39m [32m"./src/screens/Vehicle/VehiclesListScreen"[39m[33m;[39m
+ [90m    |[39m                                 [31m[1m^[22m[39m
+ [90m 42 |[39m [36mimport[39m [33mAddVehicleScreen[39m [36mfrom[39m [32m"./src/screens/Vehicle/AddVehicleScreen"[39m[33m;[39m
+ [90m 43 |[39m [36mimport[39m [33mVehicleDetailScreen[39m [36mfrom[39m [32m"./src/screens/Vehicle/VehicleDetailScreen"[39m[33m;[39m
+ [90m 44 |[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Vehicle/VehiclesListScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Account/AccountHubScreen" from "App.js"
+[0m [90m 51 |[39m
+ [90m 52 |[39m [90m// القسم J — الحساب والإضافات[39m
+[31m[1m>[22m[39m[90m 53 |[39m [36mimport[39m [33mAccountHubScreen[39m [36mfrom[39m [32m"./src/screens/Account/AccountHubScreen"[39m[33m;[39m
+ [90m    |[39m                               [31m[1m^[22m[39m
+ [90m 54 |[39m [36mimport[39m [33mEditProfileScreen[39m [36mfrom[39m [32m"./src/screens/Account/EditProfileScreen"[39m[33m;[39m
+ [90m 55 |[39m [36mimport[39m [33mAddressesScreen[39m [36mfrom[39m [32m"./src/screens/Account/AddressesScreen"[39m[33m;[39m
+ [90m 56 |[39m [36mimport[39m [33mPaymentMethodsScreen[39m [36mfrom[39m [32m"./src/screens/Account/PaymentMethodsScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Account/AccountHubScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Auth/LoginScreen" from "App.js"
+[0m [90m 12 |[39m [36mimport[39m [33mOnboardingScreen[39m [36mfrom[39m [32m"./src/screens/Onboarding/OnboardingScreen"[39m[33m;[39m
+ [90m 13 |[39m [36mimport[39m [33mRegisterScreen[39m [36mfrom[39m [32m"./src/screens/Auth/RegisterScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 14 |[39m [36mimport[39m [33mLoginScreen[39m [36mfrom[39m [32m"./src/screens/Auth/LoginScreen"[39m[33m;[39m
+ [90m    |[39m                          [31m[1m^[22m[39m
+ [90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m [33mForgotPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ForgotPasswordScreen"[39m[33m;[39m
+ [90m 17 |[39m [36mimport[39m [33mResetPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ResetPasswordScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Auth/LoginScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Auth/RegisterScreen" from "App.js"
+[0m [90m 11 |[39m
+ [90m 12 |[39m [36mimport[39m [33mOnboardingScreen[39m [36mfrom[39m [32m"./src/screens/Onboarding/OnboardingScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 13 |[39m [36mimport[39m [33mRegisterScreen[39m [36mfrom[39m [32m"./src/screens/Auth/RegisterScreen"[39m[33m;[39m
+ [90m    |[39m                             [31m[1m^[22m[39m
+ [90m 14 |[39m [36mimport[39m [33mLoginScreen[39m [36mfrom[39m [32m"./src/screens/Auth/LoginScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m [33mForgotPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ForgotPasswordScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Auth/RegisterScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Auth/OtpScreen" from "App.js"
+[0m [90m 13 |[39m [36mimport[39m [33mRegisterScreen[39m [36mfrom[39m [32m"./src/screens/Auth/RegisterScreen"[39m[33m;[39m
+ [90m 14 |[39m [36mimport[39m [33mLoginScreen[39m [36mfrom[39m [32m"./src/screens/Auth/LoginScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m
+ [90m    |[39m                        [31m[1m^[22m[39m
+ [90m 16 |[39m [36mimport[39m [33mForgotPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ForgotPasswordScreen"[39m[33m;[39m
+ [90m 17 |[39m [36mimport[39m [33mResetPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ResetPasswordScreen"[39m[33m;[39m
+ [90m 18 |[39m [36mimport[39m [33mPasswordChangedScreen[39m [36mfrom[39m [32m"./src/screens/Auth/PasswordChangedScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Auth/OtpScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Auth/ForgotPasswordScreen" from "App.js"
+[0m [90m 14 |[39m [36mimport[39m [33mLoginScreen[39m [36mfrom[39m [32m"./src/screens/Auth/LoginScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 16 |[39m [36mimport[39m [33mForgotPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ForgotPasswordScreen"[39m[33m;[39m
+ [90m    |[39m                                   [31m[1m^[22m[39m
+ [90m 17 |[39m [36mimport[39m [33mResetPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ResetPasswordScreen"[39m[33m;[39m
+ [90m 18 |[39m [36mimport[39m [33mPasswordChangedScreen[39m [36mfrom[39m [32m"./src/screens/Auth/PasswordChangedScreen"[39m[33m;[39m
+ [90m 19 |[39m [36mimport[39m [33mLocationPermissionScreen[39m [36mfrom[39m [32m"./src/screens/Main/LocationPermissionScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Auth/ForgotPasswordScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Auth/ResetPasswordScreen" from "App.js"
+[0m [90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m
+ [90m 16 |[39m [36mimport[39m [33mForgotPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ForgotPasswordScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 17 |[39m [36mimport[39m [33mResetPasswordScreen[39m [36mfrom[39m [32m"./src/screens/Auth/ResetPasswordScreen"[39m[33m;[39m
+ [90m    |[39m                                  [31m[1m^[22m[39m
+ [90m 18 |[39m [36mimport[39m [33mPasswordChangedScreen[39m [36mfrom[39m [32m"./src/screens/Auth/PasswordChangedScreen"[39m[33m;[39m
+ [90m 19 |[39m [36mimport[39m [33mLocationPermissionScreen[39m [36mfrom[39m [32m"./src/screens/Main/LocationPermissionScreen"[39m[33m;[39m
+ [90m 20 |[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Auth/ResetPasswordScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Wallet/WalletScreen" from "App.js"
+[0m [90m 44 |[39m
+ [90m 45 |[39m [90m// القسم I — المحفظة والاشتراكات[39m
+[31m[1m>[22m[39m[90m 46 |[39m [36mimport[39m [33mWalletScreen[39m [36mfrom[39m [32m"./src/screens/Wallet/WalletScreen"[39m[33m;[39m
+ [90m    |[39m                           [31m[1m^[22m[39m
+ [90m 47 |[39m [36mimport[39m [33mTopUpScreen[39m [36mfrom[39m [32m"./src/screens/Wallet/TopUpScreen"[39m[33m;[39m
+ [90m 48 |[39m [36mimport[39m [33mRedeemPointsScreen[39m [36mfrom[39m [32m"./src/screens/Wallet/RedeemPointsScreen"[39m[33m;[39m
+ [90m 49 |[39m [36mimport[39m [33mPlansScreen[39m [36mfrom[39m [32m"./src/screens/Wallet/PlansScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Wallet/WalletScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Onboarding/OnboardingScreen" from "App.js"
+[0m [90m 10 |[39m [36mimport[39m { localizeMessage[33m,[39m isDeactivatedError[33m,[39m isNotVerifiedError } [36mfrom[39m [32m"./src/services/authMessages"[39m[33m;[39m
+ [90m 11 |[39m
+[31m[1m>[22m[39m[90m 12 |[39m [36mimport[39m [33mOnboardingScreen[39m [36mfrom[39m [32m"./src/screens/Onboarding/OnboardingScreen"[39m[33m;[39m
+ [90m    |[39m                               [31m[1m^[22m[39m
+ [90m 13 |[39m [36mimport[39m [33mRegisterScreen[39m [36mfrom[39m [32m"./src/screens/Auth/RegisterScreen"[39m[33m;[39m
+ [90m 14 |[39m [36mimport[39m [33mLoginScreen[39m [36mfrom[39m [32m"./src/screens/Auth/LoginScreen"[39m[33m;[39m
+ [90m 15 |[39m [36mimport[39m [33mOtpScreen[39m [36mfrom[39m [32m"./src/screens/Auth/OtpScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Onboarding/OnboardingScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/SplashScreen" from "App.js"
+[0m [90m  7 |[39m [36mimport[39m { [33mAuthProvider[39m[33m,[39m useAuth } [36mfrom[39m [32m"./src/context/AuthContext"[39m[33m;[39m
+ [90m  8 |[39m [36mimport[39m { [33mToastProvider[39m[33m,[39m useToast } [36mfrom[39m [32m"./src/context/ToastContext"[39m[33m;[39m
+[31m[1m>[22m[39m[90m  9 |[39m [36mimport[39m [33mSplashScreen[39m [36mfrom[39m [32m"./src/screens/SplashScreen"[39m[33m;[39m
+ [90m    |[39m                           [31m[1m^[22m[39m
+ [90m 10 |[39m [36mimport[39m { localizeMessage[33m,[39m isDeactivatedError[33m,[39m isNotVerifiedError } [36mfrom[39m [32m"./src/services/authMessages"[39m[33m;[39m
+ [90m 11 |[39m
+ [90m 12 |[39m [36mimport[39m [33mOnboardingScreen[39m [36mfrom[39m [32m"./src/screens/Onboarding/OnboardingScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/SplashScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/OrderTrackingScreen" from "App.js"
+[0m [90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m
+ [90m 29 |[39m [36mimport[39m [33mProviderFoundScreen[39m [36mfrom[39m [32m"./src/screens/Order/ProviderFoundScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 30 |[39m [36mimport[39m [33mOrderTrackingScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrderTrackingScreen"[39m[33m;[39m
+ [90m    |[39m                                  [31m[1m^[22m[39m
+ [90m 31 |[39m [36mimport[39m [33mChatScreen[39m [36mfrom[39m [32m"./src/screens/Order/ChatScreen"[39m[33m;[39m
+ [90m 32 |[39m [36mimport[39m [33mConfirmCompletionScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmCompletionScreen"[39m[33m;[39m
+ [90m 33 |[39m [36mimport[39m [33mReviewScreen[39m [36mfrom[39m [32m"./src/screens/Order/ReviewScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/OrderTrackingScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/ServiceDetailScreen" from "App.js"
+[0m [90m 24 |[39m [90m// القسم E + F — تدفّق الطلب والتتبّع والإتمام[39m
+ [90m 25 |[39m [36mimport[39m [33mServiceCatalogScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceCatalogScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 26 |[39m [36mimport[39m [33mServiceDetailScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceDetailScreen"[39m[33m;[39m
+ [90m    |[39m                                  [31m[1m^[22m[39m
+ [90m 27 |[39m [36mimport[39m [33mConfirmOrderScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmOrderScreen"[39m[33m;[39m
+ [90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m
+ [90m 29 |[39m [36mimport[39m [33mProviderFoundScreen[39m [36mfrom[39m [32m"./src/screens/Order/ProviderFoundScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/ServiceDetailScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/ConfirmOrderScreen" from "App.js"
+[0m [90m 25 |[39m [36mimport[39m [33mServiceCatalogScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceCatalogScreen"[39m[33m;[39m
+ [90m 26 |[39m [36mimport[39m [33mServiceDetailScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceDetailScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 27 |[39m [36mimport[39m [33mConfirmOrderScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmOrderScreen"[39m[33m;[39m
+ [90m    |[39m                                 [31m[1m^[22m[39m
+ [90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m
+ [90m 29 |[39m [36mimport[39m [33mProviderFoundScreen[39m [36mfrom[39m [32m"./src/screens/Order/ProviderFoundScreen"[39m[33m;[39m
+ [90m 30 |[39m [36mimport[39m [33mOrderTrackingScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrderTrackingScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/ConfirmOrderScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/SearchingProviderScreen" from "App.js"
+[0m [90m 26 |[39m [36mimport[39m [33mServiceDetailScreen[39m [36mfrom[39m [32m"./src/screens/Order/ServiceDetailScreen"[39m[33m;[39m
+ [90m 27 |[39m [36mimport[39m [33mConfirmOrderScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmOrderScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m
+ [90m    |[39m                                      [31m[1m^[22m[39m
+ [90m 29 |[39m [36mimport[39m [33mProviderFoundScreen[39m [36mfrom[39m [32m"./src/screens/Order/ProviderFoundScreen"[39m[33m;[39m
+ [90m 30 |[39m [36mimport[39m [33mOrderTrackingScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrderTrackingScreen"[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m [33mChatScreen[39m [36mfrom[39m [32m"./src/screens/Order/ChatScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/SearchingProviderScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Order/ProviderFoundScreen" from "App.js"
+[0m [90m 27 |[39m [36mimport[39m [33mConfirmOrderScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmOrderScreen"[39m[33m;[39m
+ [90m 28 |[39m [36mimport[39m [33mSearchingProviderScreen[39m [36mfrom[39m [32m"./src/screens/Order/SearchingProviderScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 29 |[39m [36mimport[39m [33mProviderFoundScreen[39m [36mfrom[39m [32m"./src/screens/Order/ProviderFoundScreen"[39m[33m;[39m
+ [90m    |[39m                                  [31m[1m^[22m[39m
+ [90m 30 |[39m [36mimport[39m [33mOrderTrackingScreen[39m [36mfrom[39m [32m"./src/screens/Order/OrderTrackingScreen"[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m [33mChatScreen[39m [36mfrom[39m [32m"./src/screens/Order/ChatScreen"[39m[33m;[39m
+ [90m 32 |[39m [36mimport[39m [33mConfirmCompletionScreen[39m [36mfrom[39m [32m"./src/screens/Order/ConfirmCompletionScreen"[39m[33m;[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Order/ProviderFoundScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "./src/screens/Account/SettingsScreen" from "App.js"
+[0m [90m 59 |[39m [36mimport[39m [33mWashPlansScreen[39m [36mfrom[39m [32m"./src/screens/Account/WashPlansScreen"[39m[33m;[39m
+ [90m 60 |[39m [36mimport[39m [33mRestoreAccountScreen[39m [36mfrom[39m [32m"./src/screens/Account/RestoreAccountScreen"[39m[33m;[39m
+[31m[1m>[22m[39m[90m 61 |[39m [36mimport[39m [33mSettingsScreen[39m [36mfrom[39m [32m"./src/screens/Account/SettingsScreen"[39m[33m;[39m
+ [90m    |[39m                             [31m[1m^[22m[39m
+ [90m 62 |[39m [36mimport[39m [33mConversationsScreen[39m [36mfrom[39m [32m"./src/screens/Account/ConversationsScreen"[39m[33m;[39m
+ [90m 63 |[39m
+ [90m 64 |[39m [90m// القسم K — الخريطة والملف والاشتراك[39m[0m
+
+Import stack:
+
+ App.js
+ | import "./src/screens/Account/SettingsScreen"
+
+ index.js
+ | import "./App"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+[0m[31m[1m>[22m[39m[90m 1 |[39m [36mimport[39m { registerRootComponent } [36mfrom[39m [32m'expo'[39m[33m;[39m
+ [90m   |[39m                                        [31m[1m^[22m[39m
+ [90m 2 |[39m
+ [90m 3 |[39m [36mimport[39m [33mApp[39m [36mfrom[39m [32m'./App'[39m[33m;[39m
+ [90m 4 |[39m[0m
+
+Import stack:
+
+ index.js
+ | import "expo"
+
+ 
+ | import "./index"
+
+Unable to resolve "expo" from "index.js"
+
+undefined
+Unable to resolve "expo" from "index.js"
+
+undefined
+Unable to resolve "expo" from "index.js"
+
+undefined
+Unable to resolve "expo" from "index.js"
+
+undefined
+Unable to resolve "expo" from "index.js"
+
+undefined

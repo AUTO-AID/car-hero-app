@@ -1,82 +1,150 @@
 // ============================================================
-//  LocationPermissionScreen — ١١ · إذن الموقع  (القسم D)
-//  مُوحّدة مع نظام التصميم الجديد (theme/theme.js + مكوّنات ui)
-//  props: { lang, theme, onDone, onPickFromMap }
+//  LocationPermissionScreen — ٣ · إذن الموقع
+//
+//  أخطر شاشة في التطبيق: رفض الإذن هنا يكسر الوظيفة الأساسية (إيجاد مزوّد
+//  قريب)، وعلى iOS الرفض شبه نهائي — لا يمكن إعادة الطلب برمجياً. حوار
+//  النظام لا يُخصَّص ولك فرصة واحدة معه، وهذه الشاشة هي كل ما تملك قبله.
+//
+//  لذلك: لا نطلب الإذن قبل أن نشرح لماذا، ونعرض أربع حالات لكل منها صياغة
+//  ومخرج مختلف — الخلط بينها يرسل المستخدم إلى شاشة إعدادات خاطئة أو يعده
+//  بزر لا يفعل شيئاً.
+//
+//  props: { onDone(coords|null), onPickFromMap }
 // ============================================================
-
-import React, { useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Animated,
-  Easing,
-  Alert,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Easing, Image, Platform, StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import Svg, {
-  Defs,
-  RadialGradient as SvgRG,
-  Stop,
-  Circle,
-} from "react-native-svg";
+import Svg, { Circle, Defs, RadialGradient as SvgRG, Stop } from "react-native-svg";
 import {
-  CarProfile,
-  Truck,
   CarBattery,
-  Wrench,
-  MapPinLine,
+  CarProfile,
   ClockCountdown,
-  NavigationArrow,
   Crosshair,
+  Gear,
+  GpsSlash,
   LockSimple,
+  PencilSimple,
+  Truck,
+  Wrench,
 } from "phosphor-react-native";
-import { colors, radius, shadow, gradients } from "../../theme/theme";
-import { PrimaryButton, OutlineButton } from "../../components/ui";
+import Text from "../../components/AppText";
 import {
-  requestLocationPermission,
-  getCurrentLocation,
+  ErrorBanner,
+  LinkText,
+  OutlineButton,
+  PressableScale,
+  PrimaryButton,
+  ScreenContainer,
+} from "../../components/ui";
+import useReducedMotion from "../../hooks/useReducedMotion";
+import {
+  PERMISSION,
+  getCoords,
+  getPermissionState,
+  openLocationSettings,
+  requestPermission,
 } from "../../services/locationService";
+import { colors, font, gradients, layout, radius, shadow, spacing } from "../../theme/theme";
 
-const BENEFITS = [
+const arNum = (value) => Number(value).toLocaleString("ar-EG");
+
+// شفافية على لون موجود في النظام بدل إدخال لون جديد خارج theme.js
+const RING_SOFT = `${colors.primaryLight}30`;
+const RING_STRONG = `${colors.primaryLight}40`;
+const RING_FILL = `${colors.primaryLight}1f`;
+
+// الأسئلة الثلاثة التي يجب أن يجيبها التمهيد بصياغة ملموسة لا تسويقية:
+// ماذا نستخدمه فيه؟ متى؟ وماذا لو رفضت؟ — الإجابة الثالثة تحديداً هي ما
+// يرفع معدل الموافقة، لأنها تزيل شعور الإجبار وتُبقي للرافض طريقاً.
+const PRIMING = [
   {
-    Icon: MapPinLine,
+    key: "why",
+    Icon: Crosshair,
     bg: colors.tint,
-    fg: colors.primaryLight,
-    title: "أقرب فني إليك",
-    sub: "نطابق طلبك مع أقرب مزوّد متاح",
+    fg: colors.primary,
+    question: "ماذا نستخدم الموقع فيه؟",
+    answer: "لإرسال أقرب فني إليك، بدل أن تصف موقعك بالكلام على الهاتف.",
   },
   {
+    key: "when",
     Icon: ClockCountdown,
     bg: colors.successBg,
     fg: colors.success,
-    title: "وقت وصول أدق",
-    sub: "تقدير دقيق لموعد وصول الفني",
+    question: "متى نستخدمه؟",
+    answer: "أثناء طلبك فقط. لا نتتبّعك حين لا يكون لديك طلب نشط.",
   },
   {
-    Icon: NavigationArrow,
-    bg: "#fff4e6",
+    key: "refuse",
+    Icon: PencilSimple,
+    bg: colors.warningBg,
     fg: colors.warning,
-    title: "تتبّع مباشر للطلب",
-    sub: "راقب الفني على الخريطة لحظة بلحظة",
+    question: "وماذا لو رفضت؟",
+    answer: "يمكنك إدخال موقعك يدوياً على الخريطة، لكن الوصول سيستغرق وقتاً أطول.",
   },
 ];
 
-export default function LocationPermissionScreen({
-  lang = "ar",
-  theme = "light",
-  onDone,
-  onPickFromMap,
-}) {
-  const insets = useSafeAreaInsets();
+// خطوات الإعدادات تختلف جذرياً بين الجوال والويب: توجيه مستخدم المتصفّح
+// إلى «إعدادات التطبيق» يرسله إلى مكان لا وجود له.
+const SETTINGS_STEPS =
+  Platform.OS === "web"
+    ? [
+        "اضغط أيقونة القفل بجوار عنوان الموقع في المتصفّح",
+        "افتح «إعدادات الموقع» أو «Location»",
+        "غيّر الإذن إلى «السماح» ثم أعد تحميل الصفحة",
+      ]
+    : [
+        "افتح إعدادات الجهاز",
+        "اختر «كار هيرو» من قائمة التطبيقات",
+        "افتح «الموقع» واختر «أثناء استخدام التطبيق»",
+      ];
+
+export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
+  const reduceMotion = useReducedMotion();
   const float = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
 
+  // status === null يعني «نفحص الآن»: لا نعرض تمهيداً قد يختفي بعد جزء من
+  // الثانية إن كان الإذن ممنوحاً أصلاً — الوميض يُقرأ كخلل.
+  const [state, setState] = useState({ status: null, canAskAgain: true });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const busyRef = useRef(false);
+
   useEffect(() => {
-    Animated.loop(
+    let alive = true;
+    getPermissionState().then((next) => {
+      if (alive) setState(next);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // إذن ممنوح = لا شيء نسأله. نقرأ الإحداثيات ونخرج فوراً، فلا تتحوّل
+  // الشاشة إلى حاجز يُعرض بعد كل تسجيل دخول بلا سبب.
+  useEffect(() => {
+    if (state.status !== PERMISSION.GRANTED) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        const coords = await getCoords({ force: true, allowRequest: true });
+        if (alive) onDone?.(coords);
+      } catch {
+        if (alive) {
+          setError("تعذّر قراءة موقعك رغم منح الإذن. تأكّد من وضوح السماء أو أدخل موقعك يدوياً.");
+        }
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [state.status, onDone]);
+
+  useEffect(() => {
+    // الحركة اللانهائية تستنزف بطارية مستخدم متعطّل على الطريق، ولا تُعرض
+    // أصلاً لمن فعّل «تقليل الحركة»
+    if (reduceMotion || state.status !== PERMISSION.UNDETERMINED) return undefined;
+    const drift = Animated.loop(
       Animated.sequence([
         Animated.timing(float, {
           toValue: -8,
@@ -90,211 +158,299 @@ export default function LocationPermissionScreen({
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-      ]),
-    ).start();
-    Animated.loop(
+      ])
+    );
+    const ripple = Animated.loop(
       Animated.timing(pulse, {
         toValue: 1,
         duration: 2600,
         easing: Easing.out(Easing.ease),
         useNativeDriver: true,
-      }),
-    ).start();
+      })
+    );
+    drift.start();
+    ripple.start();
+    return () => {
+      drift.stop();
+      ripple.stop();
+    };
+  }, [reduceMotion, state.status, float, pulse]);
+
+  const handleAllow = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await requestPermission();
+      setState(next);
+      if (next.status === PERMISSION.BLOCKED) {
+        setError("رُفض الإذن نهائياً. التفعيل الآن يتم من الإعدادات فقط.");
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+
+  const handleRecheck = useCallback(async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      setState(await getPermissionState());
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+
+  const handleOpenSettings = useCallback(async () => {
+    const opened = await openLocationSettings();
+    if (!opened) setError("تعذّر فتح الإعدادات تلقائياً — افتحها يدوياً بالخطوات أعلاه.");
   }, []);
 
   const pulseStyle = {
     opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
-    transform: [
-      {
-        scale: pulse.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0.7, 1.9],
-        }),
-      },
-    ],
+    transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.9] }) }],
   };
 
-  const handleAllow = async () => {
-    const granted = await requestLocationPermission();
-    if (!granted) {
-      Alert.alert(
-        "تنبيه",
-        "الرجاء تفعيل صلاحية الموقع من الإعدادات للحصول على أفضل تجربة.",
-      );
-      return;
-    }
-    try {
-      const loc = await getCurrentLocation();
-      console.log("CURRENT LOCATION FROM PERMISSION SCREEN:", loc);
-    } catch (e) {
-      console.log(e);
-    }
-    onDone?.();
-  };
+  const status = state.status;
+  const isPriming = status === PERMISSION.UNDETERMINED;
+  // «ممنوح» يعني أننا في طريقنا للخروج، فلا نعرض إلا انتظاراً هادئاً
+  const isResolving = status === null || (status === PERMISSION.GRANTED && !error);
+  // الرفض الدائم على الويب: لا زر سماح ولا إعدادات تُفتح برمجياً — الإدخال
+  // اليدوي هو الإجراء الحقيقي الوحيد المتبقّي، فيأخذ وزن الأساسي
+  const manualIsPrimary = status === PERMISSION.BLOCKED && Platform.OS === "web";
+
+  const renderStatusIcon = (Icon, bg, fg) => (
+    <View style={[s.statusIcon, { backgroundColor: bg }]} aria-hidden>
+      <Icon size={30} weight="fill" color={fg} />
+    </View>
+  );
 
   return (
-    <View style={s.root}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          padding: 26,
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 24,
-        }}
-      >
-        {/* العلامة */}
-        <View style={s.brand}>
-          <LinearGradient
-            colors={gradients.logoTile}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={s.logo}
-          >
-            <Image
-              source={require("../../../assets/logo.png")}
-              style={{ width: 32, height: 32, resizeMode: "contain" }}
-            />
-          </LinearGradient>
-          <Text style={s.brandName}>Car Hero</Text>
+    <ScreenContainer>
+      <View style={s.brand}>
+        <LinearGradient
+          colors={gradients.logoTile}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.logo}
+        >
+          <Image
+            source={require("../../../assets/carhero-app-icon.png")}
+            style={s.logoImage}
+            alt=""
+            aria-hidden
+          />
+        </LinearGradient>
+        <Text style={s.brandName}>Car Hero</Text>
+      </View>
+
+      {isResolving ? (
+        <View style={s.resolving} accessibilityLiveRegion="polite" accessibilityRole="progressbar">
+          <Text style={s.resolvingText}>
+            {status === null ? "جارٍ فحص إعدادات الموقع…" : "جارٍ تحديد موقعك…"}
+          </Text>
         </View>
-
-        {/* الرادار */}
-        <View style={s.radar}>
-          <Svg width="100%" height="100%" style={{ position: "absolute" }}>
-            <Defs>
-              <SvgRG id="rg" cx="50%" cy="40%" r="70%">
-                <Stop offset="0%" stopColor="#f6f0fc" />
-                <Stop offset="60%" stopColor="#ecdcf7" />
-                <Stop offset="100%" stopColor="#e2cef2" />
-              </SvgRG>
-            </Defs>
-            <Circle cx="0" cy="0" r="1000" fill="url(#rg)" />
-          </Svg>
-          {/* الطرق المائلة */}
-          <View
-            style={[
-              s.road,
-              {
-                top: 30,
-                left: -20,
-                right: 44,
-                transform: [{ rotate: "-7deg" }],
-              },
-            ]}
-          />
-          <View
-            style={[
-              s.road,
-              {
-                bottom: 52,
-                left: 28,
-                right: -20,
-                transform: [{ rotate: "6deg" }],
-              },
-            ]}
-          />
-          {/* حلقات */}
-          <View
-            style={[
-              s.ring,
-              { width: 230, height: 230, borderColor: "#8f5cb130" },
-            ]}
-          />
-          <View
-            style={[
-              s.ring,
-              { width: 160, height: 160, borderColor: "#8f5cb140" },
-            ]}
-          />
-          <Animated.View
-            style={[
-              s.ring,
-              {
-                width: 96,
-                height: 96,
-                backgroundColor: "#8f5cb11f",
-                borderWidth: 0,
-              },
-              pulseStyle,
-            ]}
-          />
-          {/* أيقونات المزوّدين */}
-          <View style={[s.provChip, { top: 40, right: 52 }]}>
-            <Truck size={20} weight="fill" color={colors.primaryLight} />
-          </View>
-          <View style={[s.provChip, { bottom: 56, right: 44 }]}>
-            <CarBattery size={20} weight="fill" color={colors.primaryLight} />
-          </View>
-          <View style={[s.provChip, { bottom: 50, left: 48 }]}>
-            <Wrench size={20} weight="fill" color={colors.primaryLight} />
-          </View>
-          {/* الدبوس المركزي */}
-          <Animated.View
-            style={[
-              s.centerPin,
-              { transform: [{ rotate: "45deg" }, { translateY: float }] },
-            ]}
-          >
-            <CarProfile
-              size={30}
-              weight="fill"
-              color="#fff"
-              style={{ transform: [{ rotate: "-45deg" }] }}
-            />
-          </Animated.View>
-        </View>
-
-        <Text style={s.title}>فعّل موقعك لنجد أقرب فني إليك</Text>
-        <Text style={s.sub}>
-          نحتاج موقعك الحالي لإرسال أقرب ورشة أو فني إليك فور تعطّل سيارتك على
-          الطريق.
-        </Text>
-
-        {/* المزايا */}
-        <View style={{ marginTop: 18, gap: 10 }}>
-          {BENEFITS.map((b, i) => (
-            <View key={i} style={s.benefit}>
-              <View style={[s.benefitIcon, { backgroundColor: b.bg }]}>
-                <b.Icon size={21} weight="fill" color={b.fg} />
+      ) : (
+        <>
+          {isPriming ? (
+            <View
+              style={s.radar}
+              // aria-hidden لا accessibilityElementsHidden: الأخيرة يتجاهلها
+              // react-native-web فتبقى دوائر الرادار والطرق والدبابيس معلَنة
+              // لقارئ الشاشة كعناصر فارغة. وaria-hidden مدعومة أصلاً في
+              // RN 0.81 على المنصّات الأصلية أيضاً.
+              aria-hidden
+            >
+              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                <Defs>
+                  <SvgRG id="rg" cx="50%" cy="40%" r="70%">
+                    <Stop offset="0%" stopColor={colors.tint} />
+                    <Stop offset="60%" stopColor={colors.tint2} />
+                    <Stop offset="100%" stopColor={colors.tint3} />
+                  </SvgRG>
+                </Defs>
+                <Circle cx="0" cy="0" r="1000" fill="url(#rg)" />
+              </Svg>
+              <View style={[s.road, { top: 22, left: -20, right: 44, transform: [{ rotate: "-7deg" }] }]} />
+              <View style={[s.road, { bottom: 38, left: 28, right: -20, transform: [{ rotate: "6deg" }] }]} />
+              <View style={[s.ring, { width: 190, height: 190, borderColor: RING_SOFT }]} />
+              <View style={[s.ring, { width: 132, height: 132, borderColor: RING_STRONG }]} />
+              <Animated.View
+                style={[
+                  s.ring,
+                  { width: 84, height: 84, backgroundColor: RING_FILL, borderWidth: 0 },
+                  reduceMotion ? { opacity: 0.45 } : pulseStyle,
+                ]}
+              />
+              <View style={[s.provChip, { top: 26, right: 42 }]}>
+                <Truck size={18} weight="fill" color={colors.primaryLight} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.benefitTitle}>{b.title}</Text>
-                <Text style={s.benefitSub}>{b.sub}</Text>
+              <View style={[s.provChip, { bottom: 40, right: 34 }]}>
+                <CarBattery size={18} weight="fill" color={colors.primaryLight} />
               </View>
+              <View style={[s.provChip, { bottom: 36, left: 38 }]}>
+                <Wrench size={18} weight="fill" color={colors.primaryLight} />
+              </View>
+              <Animated.View
+                style={[
+                  s.centerPin,
+                  { transform: [{ rotate: "45deg" }, { translateY: reduceMotion ? 0 : float }] },
+                ]}
+              >
+                <CarProfile size={26} weight="fill" color={colors.onPrimary} style={s.pinIcon} />
+              </Animated.View>
             </View>
-          ))}
-        </View>
+          ) : null}
 
-        <View style={{ marginTop: 18 }}>
-          <PrimaryButton
-            label="السماح بتحديد الموقع"
-            icon={<Crosshair size={19} weight="fill" color="#fff" />}
-            onPress={handleAllow}
-          />
-          <OutlineButton
-            label="اختيار الموقع يدوياً"
-            onPress={() => onPickFromMap?.()}
-            style={{ marginTop: 12 }}
-          />
-          <View style={s.privacy}>
-            <LockSimple size={14} weight="fill" color={colors.success} />
-            <Text style={s.privacyText}>
-              لن نستخدم موقعك إلا لتحسين تجربة الخدمة
-            </Text>
+          {status === PERMISSION.DENIED ? renderStatusIcon(GpsSlash, colors.warningBg, colors.warning) : null}
+          {status === PERMISSION.BLOCKED ? renderStatusIcon(LockSimple, colors.dangerBg, colors.danger) : null}
+          {status === PERMISSION.SERVICES_OFF ? renderStatusIcon(GpsSlash, colors.infoBg, colors.info) : null}
+          {status === PERMISSION.GRANTED ? renderStatusIcon(Crosshair, colors.dangerBg, colors.danger) : null}
+
+          <Text style={s.title} accessibilityRole="header">
+            {isPriming ? "فعّل موقعك لنجد أقرب فني إليك" : null}
+            {status === PERMISSION.DENIED ? "لم يُمنح إذن الموقع" : null}
+            {status === PERMISSION.BLOCKED ? "إذن الموقع مرفوض من إعدادات الجهاز" : null}
+            {status === PERMISSION.SERVICES_OFF ? "خدمة الموقع مغلقة في جهازك" : null}
+            {status === PERMISSION.GRANTED ? "تعذّر قراءة موقعك" : null}
+          </Text>
+
+          <Text style={s.sub}>
+            {isPriming
+              ? "قبل أن يسألك جهازك، إليك بالضبط ما سنفعله بموقعك — وما البديل إن رفضت."
+              : null}
+            {status === PERMISSION.DENIED
+              ? "بدون الموقع لن نستطيع إرسال أقرب فني تلقائياً. يمكنك المحاولة مجدداً، أو إدخال موقعك يدوياً والمتابعة الآن."
+              : null}
+            {status === PERMISSION.BLOCKED
+              ? "لا يستطيع التطبيق طلب الإذن مرّة أخرى — هذا قرار النظام لا التطبيق. التفعيل يتم من الإعدادات بالخطوات التالية:"
+              : null}
+            {status === PERMISSION.SERVICES_OFF
+              ? "المشكلة ليست في الإذن: خدمة تحديد الموقع نفسها مُطفأة على مستوى الجهاز، فلا يستطيع أي تطبيق قراءة موقعك."
+              : null}
+            {status === PERMISSION.GRANTED
+              ? "الإذن ممنوح لكن الجهاز لم يُرجع إحداثيات. قد تكون الإشارة ضعيفة داخل مبنى أو نفق."
+              : null}
+          </Text>
+
+          {isPriming ? (
+            <View style={s.primingList}>
+              {PRIMING.map((item) => (
+                <View key={item.key} style={s.primingRow}>
+                  <View style={[s.primingIcon, { backgroundColor: item.bg }]} aria-hidden>
+                    <item.Icon size={20} weight="fill" color={item.fg} />
+                  </View>
+                  <View style={s.primingText}>
+                    <Text style={s.primingQuestion}>{item.question}</Text>
+                    <Text style={s.primingAnswer}>{item.answer}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {status === PERMISSION.BLOCKED ? (
+            <View style={s.steps}>
+              {SETTINGS_STEPS.map((step, stepIndex) => (
+                <View key={step} style={s.stepRow}>
+                  <View style={s.stepBadge} aria-hidden>
+                    <Text style={s.stepNumber}>{arNum(stepIndex + 1)}</Text>
+                  </View>
+                  <Text style={s.stepText}>{step}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={s.actions}>
+            <ErrorBanner message={error} style={s.banner} />
+
+            {/* في حالة الرفض الدائم لا يُعرض زر «السماح» إطلاقاً: ضغطه لن
+                يُنتج أي حوار، ووعدٌ كاذب أسوأ من غياب الخيار. */}
+            {isPriming || status === PERMISSION.DENIED ? (
+              <PrimaryButton
+                label={status === PERMISSION.DENIED ? "المحاولة مرة أخرى" : "السماح بتحديد الموقع"}
+                icon={busy ? null : <Crosshair size={19} weight="fill" color={colors.onPrimary} />}
+                onPress={handleAllow}
+                loading={busy}
+                accessibilityHint="يطلب إذن الموقع من الجهاز ثم يحدّد موقعك الحالي"
+              />
+            ) : null}
+
+            {status === PERMISSION.BLOCKED && Platform.OS !== "web" ? (
+              <PrimaryButton
+                label="فتح الإعدادات"
+                icon={<Gear size={19} weight="fill" color={colors.onPrimary} />}
+                onPress={handleOpenSettings}
+              />
+            ) : null}
+
+            {/* «الخدمة مغلقة» لا تُفتح من إعدادات التطبيق بل من إعدادات
+                النظام؛ فالمخرج هنا إعادة فحص بعد التفعيل، لا زر يرسل
+                المستخدم إلى الشاشة الخاطئة. */}
+            {status === PERMISSION.SERVICES_OFF || status === PERMISSION.GRANTED ? (
+              <PrimaryButton
+                label={status === PERMISSION.GRANTED ? "إعادة المحاولة" : "فعّلتها — أعد الفحص"}
+                onPress={handleRecheck}
+                loading={busy}
+              />
+            ) : null}
+
+            {/* مخرج بديل حقيقي في كل الحالات: وجوده يرفع الموافقة لأنه يزيل
+                شعور الإجبار، ولا يترك الرافض في طريق مسدود. ويصير هو الإجراء
+                الأساسي حين لا نملك أي إصلاح داخل التطبيق (رفض دائم على الويب):
+                شاشة بلا زر أساسي تترك العين بلا مرساة. */}
+            {manualIsPrimary ? (
+              <PrimaryButton
+                label="أُدخل موقعي يدوياً"
+                icon={<PencilSimple size={19} weight="fill" color={colors.onPrimary} />}
+                onPress={() => onPickFromMap?.()}
+                disabled={busy}
+              />
+            ) : (
+              <OutlineButton
+                label="أُدخل موقعي يدوياً"
+                onPress={() => onPickFromMap?.()}
+                disabled={busy}
+                style={s.secondary}
+              />
+            )}
+
+            {/* الشاشة لا تحجز التطبيق: التصفّح ممكن بلا موقع */}
+            <View style={s.skipRow}>
+              <PressableScale
+                onPress={() => onDone?.(null)}
+                style={s.skip}
+                accessibilityRole="button"
+                accessibilityLabel="تخطّي تحديد الموقع"
+                accessibilityHint="المتابعة إلى الرئيسية بدون موقع"
+              >
+                <LinkText style={s.skipText}>لاحقاً</LinkText>
+              </PressableScale>
+            </View>
+
+            <View style={s.privacy}>
+              <LockSimple size={14} weight="fill" color={colors.success} />
+              <Text style={s.privacyText}>لن نستخدم موقعك إلا أثناء تنفيذ طلبك</Text>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </View>
+        </>
+      )}
+    </ScreenContainer>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.surface },
   brand: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
-    gap: 11,
+    gap: spacing.md,
   },
   logo: {
     width: 44,
@@ -305,105 +461,126 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSoft,
   },
-  brandName: {
-    fontSize: 19,
-    fontWeight: "700",
-    color: colors.textHeading,
-    letterSpacing: -0.3,
-  },
+  logoImage: { width: 32, height: 32, resizeMode: "contain" },
+  brandName: { fontSize: 19, fontWeight: "700", color: colors.textHeading },
+
+  resolving: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: spacing.xxl },
+  resolvingText: { fontSize: font.size.sm, color: colors.textMuted, textAlign: "center" },
 
   radar: {
     position: "relative",
     width: "100%",
-    height: 276,
-    marginTop: 24,
+    height: 210,
+    marginTop: spacing.xl,
     borderRadius: radius.xl,
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
-  road: {
-    position: "absolute",
-    height: 16,
-    backgroundColor: "#ffffff8c",
-    borderRadius: 999,
-  },
-  ring: { position: "absolute", borderRadius: 999, borderWidth: 1.5 },
+  road: { position: "absolute", height: 14, backgroundColor: `${colors.surface}8c`, borderRadius: radius.pill },
+  ring: { position: "absolute", borderRadius: radius.pill, borderWidth: 1.5 },
   provChip: {
     position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#fff",
+    width: 38,
+    height: 38,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     ...shadow.soft,
-    shadowOffset: { width: 0, height: 8 },
   },
   centerPin: {
     position: "absolute",
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    borderBottomLeftRadius: 8,
+    width: 58,
+    height: 58,
+    borderRadius: radius.pill,
+    borderBottomLeftRadius: radius.sm,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     ...shadow.button,
   },
+  pinIcon: { transform: [{ rotate: "-45deg" }] },
+
+  statusIcon: {
+    alignSelf: "center",
+    width: 66,
+    height: 66,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.xxl,
+  },
 
   title: {
-    marginTop: 22,
+    marginTop: spacing.xl,
     textAlign: "center",
-    fontSize: 23,
+    fontSize: font.size.title,
     fontWeight: "700",
     color: colors.textDark,
     lineHeight: 32,
   },
   sub: {
-    marginTop: 10,
+    marginTop: spacing.sm,
     textAlign: "center",
-    fontSize: 14.5,
+    fontSize: font.size.md,
     color: colors.textBody,
     lineHeight: 25,
   },
 
-  benefit: {
+  primingList: { marginTop: spacing.xl, gap: spacing.sm },
+  primingRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#fff",
+    gap: spacing.md,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: 12,
+    padding: spacing.md,
   },
-  benefitIcon: {
+  primingIcon: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     alignItems: "center",
     justifyContent: "center",
   },
-  benefitTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textDark,
+  primingText: { flex: 1, minWidth: 0 },
+  primingQuestion: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  primingAnswer: {
+    marginTop: 2,
+    fontSize: font.size.sm,
+    color: colors.textBody,
+    lineHeight: 21,
     textAlign: "right",
   },
-  benefitSub: {
-    fontSize: 11.5,
-    color: colors.textMuted,
-    marginTop: 1,
-    textAlign: "right",
+
+  steps: { marginTop: spacing.lg, gap: spacing.sm },
+  stepRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
+  stepBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.pill,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  stepNumber: { fontSize: font.size.label, fontWeight: "700", color: colors.primary },
+  stepText: { flex: 1, fontSize: font.size.sm, color: colors.textBody, lineHeight: 22, textAlign: "right" },
+
+  actions: { marginTop: spacing.xl, gap: spacing.md },
+  banner: { marginBottom: spacing.xs },
+  secondary: { width: "100%" },
+  skipRow: { alignItems: "center" },
+  skip: { minHeight: layout.touchTarget, minWidth: 88, alignItems: "center", justifyContent: "center" },
+  skipText: { fontSize: font.size.sm, color: colors.textMuted, fontWeight: "600" },
 
   privacy: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    marginTop: 14,
+    gap: spacing.xs,
   },
-  privacyText: { color: colors.textMuted, fontSize: 12 },
+  privacyText: { color: colors.textMuted, fontSize: font.size.label },
 });

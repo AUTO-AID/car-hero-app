@@ -1,104 +1,259 @@
 // ============================================================
-//  ResetPasswordScreen — 9 · إنشاء كلمة مرور جديدة  (القسم C)
-//  يتضمّن مؤشّر قوّة كلمة المرور (3 أشرطة).
+//  ResetPasswordScreen — ٨ · كلمة مرور جديدة
+//
+//  المستخدم يجب أن يرى تقدّمه نحو كلمة مرور صالحة **أثناء كتابتها**، لا أن
+//  يتلقّى رفضاً عاماً بعد الإرسال. والقواعد الإلزامية وحدها تحجب — التوصيات
+//  ترشد ولا تمنع (الخادم لا يطلبها أصلاً).
 // ============================================================
+import React, { useMemo, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { Check, Key, LockSimple, WarningCircle } from "phosphor-react-native";
+import Text from "../../components/AppText";
+import {
+  AppHeader,
+  ErrorBanner,
+  InputField,
+  LinkText,
+  PrimaryButton,
+  ScreenContainer,
+} from "../../components/ui";
+import { colors, font, radius, spacing } from "../../theme/theme";
+import {
+  PASSWORD_RULES as RULES,
+  collectErrors,
+  validateConfirm,
+  validatePasswordStrength,
+} from "../../services/validators";
 
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { ArrowRight, Key, LockSimple, Info } from 'phosphor-react-native';
-import { colors } from '../../theme/theme';
-import { InputField, PrimaryButton, ScreenContainer, ErrorBanner } from '../../components/ui';
-import { isStrongPassword } from '../../services/validators';
+// انتهاء صلاحية الرمز حالة متوقّعة لا خطأ عام: تحتاج مخرجاً لا رسالة مسدودة
+const isExpiredCode = (message) =>
+  typeof message === "string" && /انتهت صلاحية|رمز غير صحيح|اطلب رمزاً/.test(message);
 
-// حساب قوّة كلمة المرور: 0..3
-function scorePassword(pw) {
-  let score = 0;
-  if (pw.length >= 8) score++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
-  if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
-  return score;
-}
-const STRENGTH = [
-  { label: 'قوّة كلمة المرور', color: colors.borderSoft, bars: 0 },
-  { label: 'ضعيفة', color: '#e05561', bars: 1 },
-  { label: 'متوسّطة', color: colors.warning, bars: 2 },
-  { label: 'قويّة', color: colors.success, bars: 3 },
-];
+export default function ResetPasswordScreen({
+  onSubmit,
+  onBack,
+  onLogin,
+  onRequestNewCode,
+  loading = false,
+  error = "",
+}) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [attempted, setAttempted] = useState(false);
+  const submitRef = useRef(false);
 
-export default function ResetPasswordScreen({ onSubmit, onBack, onLogin, loading = false, error = '' }) {
-  const [pw, setPw] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [localError, setLocalError] = useState('');
-  const score = scorePassword(pw);
-  const meta = STRENGTH[score];
+  const rulesState = useMemo(
+    () => RULES.map((rule) => ({ ...rule, met: rule.test(password) })),
+    [password]
+  );
+  const required = rulesState.filter((rule) => rule.required);
+  const metRequired = required.filter((rule) => rule.met).length;
+  const allRequiredMet = metRequired === required.length;
+  const confirmMatches = confirm.length > 0 && confirm === password;
+  const canSubmit = allRequiredMet && confirmMatches;
+
+  const validateAll = () => ({
+    password: validatePasswordStrength(password),
+    confirm: validateConfirm(confirm, password),
+  });
+
+  const revalidate = (key, nextValues = {}) => {
+    if (!touched[key] && !attempted) return;
+    const values = { password, confirm, ...nextValues };
+    const message =
+      key === "password"
+        ? validatePasswordStrength(values.password)
+        : validateConfirm(values.confirm, values.password);
+    setFieldErrors((prev) => ({ ...prev, [key]: message }));
+  };
+
+  const onBlurField = (key) => {
+    setTouched((prev) => ({ ...prev, [key]: true }));
+    setFieldErrors((prev) => ({ ...prev, [key]: validateAll()[key] }));
+  };
 
   const submit = () => {
-    if (!isStrongPassword(pw))
-      return setLocalError('كلمة المرور: 8 رموز على الأقل مع حرف كبير وصغير ورقم ورمز');
-    if (pw !== confirm) return setLocalError('كلمتا المرور غير متطابقتين');
-    setLocalError('');
-    onSubmit?.({ password: pw });
+    if (loading || submitRef.current) return;
+    setAttempted(true);
+    const { errors, valid } = collectErrors(validateAll());
+    setTouched({ password: true, confirm: true });
+    setFieldErrors(errors);
+    if (!valid) return;
+    submitRef.current = true;
+    onSubmit?.({ password });
+    setTimeout(() => {
+      submitRef.current = false;
+    }, 0);
   };
+
+  const expired = isExpiredCode(error);
 
   return (
     <ScreenContainer>
-      <Pressable style={s.back} onPress={() => onBack?.()}>
-        <ArrowRight size={20} color={colors.primary} />
-      </Pressable>
+      <AppHeader title="كلمة مرور جديدة" onBack={onBack} />
+      <View style={styles.iconWrap} aria-hidden>
+        <Key size={34} weight="fill" color={colors.primary} />
+      </View>
+      <Text style={styles.title} accessibilityRole="header">أنشئ كلمة مرور قوية</Text>
+      <Text style={styles.body}>استخدم كلمة مختلفة عن كلمات المرور السابقة لحماية حسابك.</Text>
 
-      <View style={s.badge}><Key size={48} weight="fill" color={colors.primary} /></View>
-      <Text style={s.title}>إنشاء كلمة مرور جديدة</Text>
-      <Text style={s.sub}>اختر كلمة مرور قويّة لحماية حسابك.</Text>
+      <View style={styles.form}>
+        <InputField
+          label="كلمة المرور الجديدة"
+          placeholder="أدخل كلمة المرور"
+          secure
+          value={password}
+          onChangeText={(value) => {
+            setPassword(value);
+            revalidate("password", { password: value });
+            revalidate("confirm", { password: value });
+          }}
+          onBlur={() => onBlurField("password")}
+          error={fieldErrors.password}
+          textContentType="newPassword"
+          autoComplete="new-password"
+          icon={<LockSimple size={20} color={colors.primary} />}
+        />
 
-      <View style={{ marginTop: 24, gap: 16 }}>
-        <View>
-          <InputField
-            label="كلمة المرور الجديدة" placeholder="••••••••" secure
-            value={pw} onChangeText={(t) => { setPw(t); setLocalError(''); }}
-            icon={<LockSimple size={20} color={colors.primaryLight} />}
-          />
-          {/* أشرطة القوّة */}
-          <View style={s.bars}>
-            {[0, 1, 2].map(i => (
-              <View key={i} style={[s.bar, { backgroundColor: i < meta.bars ? meta.color : colors.borderSoft }]} />
-            ))}
-          </View>
-          <Text style={[s.strengthLabel, { color: score ? meta.color : colors.textMuted2 }]}>{meta.label}</Text>
+        {/* الأشرطة تقيس الإلزامي وحده: احتساب التوصيات كان يجعل كلمة صالحة
+            تبدو ناقصة، فيظنّ المستخدم أنها سترفَض. */}
+        <View
+          style={styles.strengthBars}
+          accessibilityRole="progressbar"
+          accessibilityLabel={`استوفيت ${metRequired} من ${required.length} شروط إلزامية`}
+        >
+          {required.map((rule, index) => (
+            <View key={rule.key} style={[styles.strengthBar, index < metRequired && styles.strengthBarActive]} />
+          ))}
+        </View>
+
+        <View style={styles.rules}>
+          {rulesState.map((rule) => (
+            <View key={rule.key} style={styles.rule}>
+              <View style={[styles.ruleCheck, rule.met && styles.ruleCheckActive]}>
+                {rule.met ? <Check size={11} weight="bold" color={colors.onPrimary} /> : null}
+              </View>
+              <Text
+                style={[
+                  styles.ruleText,
+                  rule.met && styles.ruleTextActive,
+                  !rule.required && styles.ruleTextOptional,
+                ]}
+              >
+                {rule.required ? rule.label : `${rule.label} — اختياري`}
+              </Text>
+            </View>
+          ))}
         </View>
 
         <InputField
-          label="تأكيد كلمة المرور الجديدة" placeholder="••••••••" secure
-          value={confirm} onChangeText={(t) => { setConfirm(t); setLocalError(''); }}
-          icon={<LockSimple size={20} color={colors.primaryLight} />}
+          label="تأكيد كلمة المرور"
+          placeholder="أعد إدخال كلمة المرور"
+          secure
+          value={confirm}
+          onChangeText={(value) => { setConfirm(value); revalidate("confirm", { confirm: value }); }}
+          onBlur={() => onBlurField("confirm")}
+          error={fieldErrors.confirm}
+          textContentType="newPassword"
+          autoComplete="new-password"
+          onSubmitEditing={submit}
+          returnKeyType="done"
+          icon={<LockSimple size={20} color={colors.primary} />}
         />
+        {confirmMatches ? (
+          <View style={styles.matchRow} accessibilityLiveRegion="polite">
+            <Check size={13} weight="bold" color={colors.success} />
+            <Text style={styles.matchText}>كلمتا المرور متطابقتان</Text>
+          </View>
+        ) : null}
 
-        <View style={s.infoRow}>
-          <Info size={15} color={colors.primaryLight} />
-          <Text style={s.infoText}>8 رموز على الأقل مع حرف كبير وصغير ورقم ورمز خاص</Text>
+        <ErrorBanner message={error} />
+
+        {/* انتهاء صلاحية الرمز له مخرج، لا رسالة خطأ مسدودة */}
+        {expired && onRequestNewCode ? (
+          <LinkText onPress={onRequestNewCode} style={styles.newCodeLink}>
+            طلب رمز جديد
+          </LinkText>
+        ) : null}
+
+        {/* نتيجة الحفظ تُعلَن قبله لا بعده */}
+        <View style={styles.noticeRow}>
+          <WarningCircle size={15} weight="fill" color={colors.warning} />
+          <Text style={styles.noticeText}>
+            بعد الحفظ ستُنهى جلساتك المفتوحة على الأجهزة الأخرى.
+          </Text>
         </View>
-
-        <ErrorBanner message={localError || error} />
       </View>
 
-      <View style={{ flex: 1, minHeight: 24 }} />
+      <PrimaryButton
+        label="حفظ كلمة المرور"
+        onPress={submit}
+        loading={loading}
+        disabled={!canSubmit}
+        style={styles.button}
+        // التعطيل لا يكون صامتاً أبداً: السبب معلن نصّاً ومرئي في القائمة أعلاه
+        accessibilityHint={
+          !canSubmit
+            ? !allRequiredMet
+              ? "استوفِ الشروط الإلزامية أولاً"
+              : "أعد إدخال كلمة المرور نفسها في حقل التأكيد"
+            : undefined
+        }
+      />
+      {!canSubmit ? (
+        <Text style={styles.blockedReason}>
+          {!allRequiredMet
+            ? "أكمل الشروط الإلزامية أعلاه لتفعيل الحفظ."
+            : "أدخل التأكيد المطابق لتفعيل الحفظ."}
+        </Text>
+      ) : null}
 
-      <PrimaryButton label="حفظ كلمة المرور" onPress={submit} loading={loading} />
-      <Text style={s.backLink} onPress={() => onLogin?.()}>العودة لتسجيل الدخول</Text>
+      <LinkText onPress={onLogin} style={styles.loginLink}>العودة لتسجيل الدخول</LinkText>
     </ScreenContainer>
   );
 }
 
-const s = StyleSheet.create({
-  back: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end' },
-  badge: { width: 96, height: 96, borderRadius: 28, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 20 },
-  title: { marginTop: 22, textAlign: 'center', fontSize: 23, fontWeight: '700', color: colors.textDark },
-  sub: { marginTop: 10, textAlign: 'center', fontSize: 14.5, color: colors.textBody, lineHeight: 25 },
-
-  bars: { flexDirection: 'row-reverse', gap: 6, marginTop: 10 },
-  bar: { flex: 1, height: 5, borderRadius: 999 },
-  strengthLabel: { fontSize: 12, marginTop: 6, textAlign: 'right' },
-
-  infoRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 6 },
-  infoText: { color: colors.textMuted, fontSize: 12 },
-  backLink: { textAlign: 'center', fontSize: 13.5, color: colors.primary, fontWeight: '700', marginTop: 14 },
+const styles = StyleSheet.create({
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    marginTop: spacing.xl,
+  },
+  title: { marginTop: spacing.xl, textAlign: "center", fontSize: font.size.title, fontWeight: "700", color: colors.textDark },
+  body: { maxWidth: 380, alignSelf: "center", marginTop: spacing.sm, textAlign: "center", fontSize: font.size.sm, color: colors.textBody, lineHeight: 24 },
+  form: { marginTop: spacing.xxl, gap: spacing.lg },
+  strengthBars: { flexDirection: "row-reverse", gap: 5, marginTop: -10 },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  strengthBarActive: { backgroundColor: colors.success },
+  rules: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm },
+  rule: { width: "48%", minHeight: 28, flexDirection: "row-reverse", alignItems: "center", gap: 6 },
+  ruleCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.borderInput,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ruleCheckActive: { borderColor: colors.success, backgroundColor: colors.success },
+  ruleText: { flex: 1, fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
+  ruleTextActive: { color: colors.success, fontWeight: "600" },
+  ruleTextOptional: { color: colors.textMuted2 },
+  matchRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.xs, marginTop: -spacing.sm },
+  matchText: { fontSize: font.size.xs, color: colors.success, fontWeight: "600" },
+  newCodeLink: { textAlign: "center", fontSize: font.size.sm },
+  noticeRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.xs },
+  noticeText: { flex: 1, fontSize: font.size.xs, color: colors.textMuted, lineHeight: 20, textAlign: "right" },
+  button: { marginTop: spacing.xl },
+  blockedReason: { marginTop: spacing.sm, textAlign: "center", fontSize: font.size.xs, color: colors.textMuted },
+  loginLink: { textAlign: "center", marginTop: spacing.lg, fontSize: font.size.sm },
 });

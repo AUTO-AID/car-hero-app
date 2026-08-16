@@ -2,11 +2,15 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useFonts } from "expo-font";
 
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { ToastProvider, useToast } from "./src/context/ToastContext";
-import SplashScreen from "./src/screens/SplashScreen";
-import { localizeMessage, isDeactivatedError, isNotVerifiedError } from "./src/services/authMessages";
+import { NotificationsProvider, useNotifications } from "./src/context/NotificationsContext";
+import SplashScreen, { useBootPhase } from "./src/screens/SplashScreen";
+import { localizeMessage, isDeactivatedError, isNotVerifiedError, mapServerFieldErrors } from "./src/services/authMessages";
+import { setManualCoords } from "./src/services/locationService";
+import { qaState } from "./src/services/qa";
 
 import OnboardingScreen from "./src/screens/Onboarding/OnboardingScreen";
 import RegisterScreen from "./src/screens/Auth/RegisterScreen";
@@ -69,20 +73,33 @@ import BottomTabBar from "./src/components/BottomTabBar";
 
 // المزوّدات في الأعلى، والمنطق في Root ليستفيد من useAuth/useToast
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    Cairo_400Regular: require("@expo-google-fonts/cairo/400Regular/Cairo_400Regular.ttf"),
+    Cairo_500Medium: require("@expo-google-fonts/cairo/500Medium/Cairo_500Medium.ttf"),
+    Cairo_600SemiBold: require("@expo-google-fonts/cairo/600SemiBold/Cairo_600SemiBold.ttf"),
+    Cairo_700Bold: require("@expo-google-fonts/cairo/700Bold/Cairo_700Bold.ttf"),
+  });
+
+  // لا نحجب تركيب المزوّدات على تحميل الخطوط: التحقّق من الجلسة يبدأ داخل
+  // AuthProvider، وحجبه خلف الخطوط كان يجعل زمن الإقلاع = الخطوط + الشبكة.
+  // الآن يجريان معاً، وشاشة الإقلاع الواحدة تنتظر أبطأهما.
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <ToastProvider>
-          <Root />
-        </ToastProvider>
+        <NotificationsProvider>
+          <ToastProvider>
+            <Root fontsReady={fontsLoaded || !!fontError} />
+          </ToastProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
 }
 
-function Root() {
+function Root({ fontsReady = true }) {
   const auth = useAuth();
   const toast = useToast();
+  const { unreadCount, refreshUnreadCount } = useNotifications();
 
   const [step, setStep] = useState("onboarding");
   const [navStack, setNavStack] = useState([]);
@@ -96,15 +113,27 @@ function Root() {
   const [recoveryCode, setRecoveryCode] = useState(""); // رمز الاستعادة يُحمل حتى شاشة إعادة التعيين
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  // أخطاء الخادم موزّعة على حقولها: الخادم يرفض عدّة حقول دفعة واحدة،
+  // وعرضها كرسالة واحدة عامة يجعل المستخدم يصلح واحداً ثم يُفاجأ بالتالي.
+  const [authFieldErrors, setAuthFieldErrors] = useState({});
+  // نوع الفشل لا نصّه: الشاشة تحتاج أن تفرّق بين «بياناتك خاطئة» و«الشبكة
+  // مقطوعة» لتعرض مخرجاً مختلفاً — الخلط بينهما يجعل المستخدم يشكّ في نفسه.
+  const [authErrorKind, setAuthErrorKind] = useState("");
 
   const [location, setLocation] = useState(null);
 
   // لمعرفة من أين فُتحت الخريطة
   const [mapFrom, setMapFrom] = useState("home"); // home | locationPermission
 
+  // مرجع لأحدث معاملات الشاشة الحالية، تقرأه goTo عند الدفع للمكدّس
+  const routeParamsRef = useRef({});
+
   // -------- Navigation helpers (بدون مكتبة تنقل) --------
+  // كل عنصر في المكدّس يحفظ الخطوة ومعاملاتها معاً. كان يحفظ اسم الخطوة فقط
+  // بينما routeParams كائن واحد مشترك، فالرجوع لشاشة تعتمد على معاملاتها
+  // (تفاصيل خدمة/طلب/فني) كان يعرض «المعرّف غير متوفر» بدل محتواها.
   const goTo = (nextStep) => {
-    setNavStack((prev) => [...prev, step]);
+    setNavStack((prev) => [...prev, { step, params: routeParamsRef.current }]);
     setStep(nextStep);
   };
 
@@ -112,7 +141,9 @@ function Root() {
     setNavStack((prev) => {
       if (!prev.length) return prev;
       const last = prev[prev.length - 1];
-      setStep(last);
+      const entry = typeof last === "string" ? { step: last, params: {} } : last;
+      setRouteParams(entry.params || {});
+      setStep(entry.step);
       return prev.slice(0, -1);
     });
   };
@@ -127,9 +158,18 @@ function Root() {
   // توجيه التنقّل حسب حالة المصادقة (auto-login عند الإقلاع، والخروج عند انتهاء الجلسة)
   const bootedRef = useRef(false);
   useEffect(() => {
-    if (auth.status === "loading") return;
+    // 'error' ليست نتيجة إقلاع: المستخدم لم يقرّر بعد (إعادة محاولة/دون اتصال)
+    if (auth.isBooting) return;
     if (!bootedRef.current) {
       bootedRef.current = true;
+      // قفزة تطويرية إلى أي شاشة عبر ?qa=<step> — تُلغى تلقائياً خارج __DEV__.
+      // كثير من الشاشات يقع خلف تدفّقات ذات آثار خارجية (رسائل OTP فعلية)،
+      // فالوصول إليها للفحص كان يتطلّب تعديل الكود ثم عكسه في كل مرّة.
+      const qaStep = qaState();
+      if (qaStep) {
+        setStep(qaStep);
+        return;
+      }
       // أول إقلاع: مسجّل → الرئيسية، غير مسجّل → Onboarding (أول مرّة) أو Login
       if (auth.status === "authenticated") setStep("home");
       else setStep(auth.seenOnboarding ? "login" : "onboarding");
@@ -140,7 +180,7 @@ function Root() {
       setNavStack([]);
       setStep("login");
     }
-  }, [auth.status]);
+  }, [auth.status, auth.isBooting]);
 
   // الانتقال بين شاشات المصادقة مع تصفير الخطأ
   const goAuth = (nextStep) => {
@@ -155,24 +195,43 @@ function Root() {
   };
 
   // توحيد استدعاءات المصادقة → { ok, result, error }
+  // authBusyRef يمنع الإرسال المزدوج: تعطيل الزر يعتمد على setState غير المتزامن،
+  // فالنقر المزدوج السريع قد يمرّ قبل إعادة الرسم. الحارس هنا يغطي كل الشاشات.
+  const authBusyRef = useRef(false);
   const runAuth = async (fn) => {
+    if (authBusyRef.current) return { ok: false, busy: true };
+    authBusyRef.current = true;
     setAuthError("");
+    setAuthFieldErrors({});
+    setAuthErrorKind("");
     setAuthLoading(true);
     try {
       return { ok: true, result: await fn() };
     } catch (e) {
       setAuthError(e?.message || "حدث خطأ، حاول مجدداً");
+      setAuthFieldErrors(mapServerFieldErrors(e));
+      // statusCode 0 هو ما يضعه api.js لفشل الشبكة قبل وصول أي ردّ
+      setAuthErrorKind(e?.statusCode === 0 ? "network" : e?.statusCode === 401 ? "credentials" : "other");
       return { ok: false, error: e };
     } finally {
+      authBusyRef.current = false;
       setAuthLoading(false);
     }
   };
 
   // إنشاء حساب → إرسال OTP (وضع التحقّق)
-  const handleRegister = async ({ fullName, phone, password }) => {
-    const { ok, result } = await runAuth(() => auth.signUp({ fullName, phone, password }));
+  const handleRegister = async ({ fullName, phone, password, isTermsAccepted }) => {
+    const { ok, result } = await runAuth(() =>
+      auth.signUp({ fullName, phone, password, isTermsAccepted })
+    );
     if (ok) {
       setAuthPhone(phone);
+      // وضع تخطّي OTP (تطوير): الباك أرجع جلسة → دخول مباشر بلا شاشة رمز
+      if (result?._session) {
+        toast.success("تم إنشاء الحساب بنجاح");
+        goAuth("locationPermission");
+        return;
+      }
       setOtpMode("verify");
       goAuth("otp");
       toast.success(localizeMessage(result?.message, "تم إرسال رمز التحقّق"));
@@ -237,6 +296,13 @@ function Root() {
     const { ok, result } = await runAuth(() => auth.forgotPassword({ phone }));
     if (ok) {
       setAuthPhone(phone);
+      // تعليق OTP في التطوير: الخادم يطلب تخطّي شاشة الرمز → مباشرة لإعادة التعيين.
+      // تُزال هذه الحالة تلقائياً عند إعادة تفعيل OTP (الخادم لن يرسل العلم).
+      if (result?.otpBypassed) {
+        setRecoveryCode("");
+        goAuth("resetPassword");
+        return;
+      }
       setOtpMode("recovery");
       goAuth("otp");
       toast.success(localizeMessage(result?.message, "تم إرسال رمز التحقّق"));
@@ -268,6 +334,7 @@ function Root() {
 
   // -------- مُحوّل تنقّل لشاشات القسم E/F (تعمل بأسلوب navigation/route) --------
   const [routeParams, setRouteParams] = useState({});
+  routeParamsRef.current = routeParams;
 
   // أسماء المسارات داخل تلك الشاشات → مفاتيح الخطوات في App
   const ROUTE_TO_STEP = {
@@ -308,6 +375,7 @@ function Root() {
     Settings: "settings",
     Conversations: "conversations",
     ProvidersMap: "providersMap",
+    InteractiveMap: "interactiveMap",
     ProviderProfile: "providerProfile",
     PremiumPaywall: "premiumPaywall",
     // مسارات المصادقة (لأزرار تسجيل الخروج/الاستعادة)
@@ -341,8 +409,25 @@ function Root() {
     return step;
   }, [isTabStep, step]);
 
-  // شاشة الإقلاع أثناء التحقّق من الجلسة
-  if (auth.isLoading) return <SplashScreen />;
+  // -------- بوّابة الإقلاع --------
+  // مصدرا الانتظار (الخطوط + التحقّق من الجلسة) يُجمعان في شاشة إقلاع واحدة
+  // بمهلة واحدة، فلا يرى المستخدم شاشتَي انتظار متتاليتين.
+  const bootPending = !fontsReady || auth.isBooting;
+  const bootPhase = useBootPhase(bootPending);
+  // وجهة الشعار في الانتقال المتصل: تُقرأ من الخطوة التي استقرّ عليها التوجيه
+  const bootDestination = ["onboarding", "login"].includes(step) ? step : "home";
+  const splash = (
+    <SplashScreen
+      pending={bootPending}
+      exiting={bootPhase === "exiting"}
+      destination={bootDestination}
+      error={auth.bootError}
+      canContinueOffline={auth.canContinueOffline}
+      onRetry={auth.retryBootstrap}
+      onContinueOffline={auth.continueOffline}
+    />
+  );
+  if (bootPhase === "busy") return splash;
 
   return (
     <View
@@ -369,14 +454,19 @@ function Root() {
             onLogin={() => goAuth("login")}
             loading={authLoading}
             error={authError}
+            serverFieldErrors={authFieldErrors}
           />
         )}
 
         {/* تسجيل الدخول — القسم 2 (B) */}
         {step === "login" && (
           <LoginScreen
+            errorKind={authErrorKind}
             onSubmit={handleLogin}
-            onForgotPassword={() => goAuth("forgotPassword")}
+            onForgotPassword={(typedPhone) => {
+              if (typedPhone) setAuthPhone(typedPhone);
+              goAuth("forgotPassword");
+            }}
             onRegister={() => goAuth("register")}
             loading={authLoading}
             error={authError}
@@ -391,6 +481,16 @@ function Root() {
             loading={authLoading}
             serverError={authError}
             onResend={handleOtpResend}
+            // «تعديل الرقم» يعود إلى الشاشة التي يُدخَل فيها الرقم لهذا المسار
+            onChangePhone={() =>
+              goAuth(
+                otpMode === "recovery"
+                  ? "forgotPassword"
+                  : otpMode === "restore"
+                    ? "restoreAccount"
+                    : "register",
+              )
+            }
             onBack={() =>
               goAuth(
                 otpMode === "recovery"
@@ -408,6 +508,7 @@ function Root() {
         {step === "forgotPassword" && (
           <ForgotPasswordScreen
             onSubmit={handleForgotPassword}
+            initialPhone={authPhone}
             onBack={() => goAuth("login")}
             onLogin={() => goAuth("login")}
             loading={authLoading}
@@ -419,7 +520,11 @@ function Root() {
         {step === "resetPassword" && (
           <ResetPasswordScreen
             onSubmit={handleResetPassword}
-            onBack={() => goAuth("otp")}
+            // بلا رمز استعادة يعني أننا وصلنا هنا بتخطّي شاشة OTP،
+            // فالرجوع إليها يوقع المستخدم في شاشة ميتة → نعود لطلب الرقم.
+            onBack={() => goAuth(recoveryCode ? "otp" : "forgotPassword")}
+            // انتهاء صلاحية الرمز يحتاج مخرجاً: نعيده لطلب رمز جديد بالرقم نفسه
+            onRequestNewCode={() => { setRecoveryCode(""); goAuth("forgotPassword"); }}
             onLogin={() => goAuth("login")}
             loading={authLoading}
             error={authError}
@@ -427,8 +532,9 @@ function Root() {
         )}
 
         {/* نجاح تغيير كلمة المرور — القسم 2 (C) */}
+        {/* نهاية تدفّق الاستعادة: نصفّر المكدّس فلا يمكن الرجوع لشاشاته */}
         {step === "passwordChanged" && (
-          <PasswordChangedScreen onDone={() => goAuth("login")} />
+          <PasswordChangedScreen onDone={() => { setNavStack([]); goAuth("login"); }} />
         )}
 
         {/* شاشة صلاحيات الموقع */}
@@ -436,7 +542,12 @@ function Root() {
           <LocationPermissionScreen
             lang={lang}
             theme={theme}
-            onDone={() => setStep("home")}
+            // الإحداثيات كانت تُجلب ثم تُهمَل، فيبقى موقع التطبيق null
+            // وتفتح الخريطة على دمشق الافتراضية. الآن نحفظها فعلياً.
+            onDone={(coords) => {
+              if (coords) setLocation(coords);
+              setStep("home");
+            }}
             onPickFromMap={() => {
               setMapFrom("locationPermission");
               goTo("interactiveMap");
@@ -450,13 +561,20 @@ function Root() {
             lang={lang}
             theme={theme}
             userLocation={location}
-            fromStep={mapFrom}
+            // الشاشات التي تفتح الخريطة عبر nav تمرّر وجهة العودة في المعطيات،
+            // فتُعاد إليها بعد التأكيد بدل الرجوع إلى وجهة ثابتة
+            fromStep={routeParams?.from || mapFrom}
             onBack={(from) => {
               if (from) setStep(from);
               else goBack();
             }}
             onConfirm={(pickedLoc, from) => {
               setLocation(pickedLoc);
+              // الموقع المُختار يدوياً يُودَع في مصدر الموقع الوحيد، وإلا
+              // عادت شاشات الطلب (التفاصيل/التأكيد/المزوّدون) تسأل الجهاز
+              // وتتجاهل اختياره — وهو ما كان يجعل المسار اليدوي ينتهي
+              // بخطأ «يرجى السماح بالوصول إلى الموقع» رغم أنه اختار موقعه.
+              setManualCoords(pickedLoc);
               if (from === "locationPermission") {
                 setStep("home");
                 return;
@@ -494,6 +612,9 @@ function Root() {
             initialPhone={authPhone}
             onSubmit={handleRequestRestore}
             onBack={() => (navStack.length ? goBack() : goAuth("login"))}
+            // كل مسار فشل له خطوة تالية: حساب جديد أو دعم — لا طريق مسدود
+            onCreateNew={() => goAuth("register")}
+            onSupport={() => nav.navigate("Conversations")}
             loading={authLoading}
             error={authError}
           />
@@ -587,9 +708,20 @@ function Root() {
                 currentUser={currentUser}
                 location={location}
                 onOpenMapExplore={() => nav.navigate("ProvidersMap")}
-                onOpenMapExplore={() => nav.navigate("ProvidersMap")}
+                // شريط «موقع الخدمة» يفتح منتقي الموقع، لا تصفّح المزوّدين
+                onPickLocation={() => {
+                  setMapFrom("home");
+                  goTo("interactiveMap");
+                }}
+                unreadCount={unreadCount}
                 onOpenNotifications={() => nav.navigate("Notifications")}
-                onSelectService={() => setStep("services")}
+                onTrackOrder={(order) =>
+                  nav.navigate("Tracking", { orderId: order?.id || order?._id, order })
+                }
+                onSelectService={(service) => nav.navigate("ServiceDetail", {
+                  serviceId: service?.id || service?._id,
+                  service,
+                })}
                 onOpenCatalog={() => setStep("services")}
                 onOpenOffers={() => nav.navigate("Offers")}
                 onOpenOrders={() => setStep("orders")}
@@ -670,7 +802,11 @@ function Root() {
             onSkip={() => leaveOnboarding("login")}
           />
         )}
+
+        {/* أثناء "exiting" تكون الشاشة التالية مركّبة تحت الإقلاع وهو ما يزال
+            معتماً، فيغطّي تلاشيه أوّل إطار لها: لا وميض ولا قفزة تخطيط.
+            آخر عنصر عمداً — الترتيب هو ما يحدّد طبقة الرسم في React Native. */}
+        {bootPhase === "exiting" ? splash : null}
     </View>
   );
 }
- 

@@ -1,20 +1,11 @@
-// ============================================================
-//  BottomTabBar — شريط التنقّل السفلي (بطاقة عائمة)
-//  مُوحّد مع نظام التصميم الحديث (theme/theme.js + أيقونات phosphor)
-//  التابات الخمسة الحديثة (تطابق isTabStep في App.js):
-//    home · services · orders · vehicles · account
-//  عقد الـ props: { current, onChange }
-//    current: "home" | "services" | "orders" | "vehicles" | "account"
-//    onChange: (id) => void   ← يستدعيها App.js لتبديل الـ step
-// ============================================================
-
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, StyleSheet } from "react-native";
+import Text from "./AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { House, SquaresFour, ClipboardText, CarProfile, User } from "phosphor-react-native";
-import { colors, shadow } from "../theme/theme";
+import { CarProfile, ClipboardText, House, SquaresFour, User } from "phosphor-react-native";
+import { colors, font, layout } from "../theme/theme";
+import { PressableScale } from "./ui";
 
-// الترتيب منطقيّ من اليمين لليسار (RTL) عبر flexDirection: row-reverse بالأسفل
 const TABS = [
   { id: "home", label: "الرئيسية", Icon: House },
   { id: "services", label: "الخدمات", Icon: SquaresFour },
@@ -27,32 +18,29 @@ export default function BottomTabBar({ current, onChange }) {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { marginBottom: Math.max(insets.bottom, 12) }]}>
+    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 6) }]}>
       {TABS.map(({ id, label, Icon }) => {
         const active = current === id;
-        const tone = active ? colors.primaryLight : "#a79fb3";
+        const tone = active ? colors.primary : colors.textMuted;
         return (
-          <Pressable
+          <PressableScale
             key={id}
-            style={({ pressed }) => [styles.tab, pressed && !active && { opacity: 0.6 }]}
-            onPress={() => onChange?.(id)}
+            style={styles.tab}
+            onPress={() => !active && onChange?.(id)}
+            feedback={active ? false : "selection"}
             hitSlop={6}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={label}
           >
-            {/* مؤشّر التبويب النشط أعلى العنصر */}
-            <View style={[styles.indicator, active && styles.indicatorOn]} />
             <View style={[styles.iconWrap, active && styles.iconWrapOn]}>
               <Icon size={22} weight={active ? "fill" : "regular"} color={tone} />
             </View>
-            <Text
-              style={[styles.label, { color: tone, fontWeight: active ? "700" : "600" }]}
-              numberOfLines={1}
-            >
+            <Text style={[styles.label, { color: tone, fontWeight: active ? "700" : "600" }]} numberOfLines={1}>
               {label}
             </Text>
-          </Pressable>
+            <View style={[styles.indicator, active && styles.indicatorOn]} />
+          </PressableScale>
         );
       })}
     </View>
@@ -60,34 +48,20 @@ export default function BottomTabBar({ current, onChange }) {
 }
 
 const styles = StyleSheet.create({
-  // بطاقة عائمة ضمن التدفّق العادي — لا تُغطّي محتوى الشاشات
   container: {
     flexDirection: "row-reverse",
-    marginHorizontal: 14,
-    marginTop: 6,
-    height: 66,
+    minHeight: 64,
     backgroundColor: "#fff",
-    borderRadius: 22,
-    paddingHorizontal: 8,
-    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: 6,
+    paddingTop: 6,
     alignItems: "center",
-    ...shadow.soft,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.16,
-    shadowRadius: 26,
-    elevation: 12,
   },
-  // كل تبويب يأخذ حصّة متساوية → توزيع متناسق دائماً
-  tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 3 },
-  indicator: {
-    width: 18,
-    height: 3,
-    borderRadius: 999,
-    backgroundColor: "transparent",
-    marginBottom: 2,
-  },
+  tab: { flex: 1, minWidth: 0, minHeight: layout.touchTarget, alignItems: "center", justifyContent: "center", gap: 2 },
+  indicator: { width: 20, height: 2, borderRadius: 1, backgroundColor: "transparent", marginTop: 2 },
   indicatorOn: { backgroundColor: colors.primaryLight },
-  iconWrap: { width: 46, height: 32, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  iconWrap: { width: 36, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   iconWrapOn: { backgroundColor: colors.tint },
-  label: { fontSize: 10.5 },
+  label: { fontSize: font.size.xxs, textAlign: "center" },
 });

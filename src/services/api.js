@@ -1,11 +1,3 @@
-// ============================================================
-//  api — عميل HTTP موحّد للتواصل مع الـ Backend
-//  المسؤوليات:
-//   - ترويسة JSON وإرفاق Bearer token عند الحاجة
-//   - فكّ غلاف TransformInterceptor: { success, data, timestamp }
-//   - توحيد + تعريب رسائل الأخطاء (نص أو مصفوفة class-validator)
-//   - تجديد التوكن تلقائياً عند 401 وإعادة الطلب مرّة واحدة (بقفل)
-// ============================================================
 import { API_URL } from './config';
 import {
   getAccessToken,
@@ -24,19 +16,26 @@ export class ApiError extends Error {
   }
 }
 
-// يُستدعى عند فشل التجديد نهائياً (انتهاء الجلسة) لتحديث حالة المصادقة في التطبيق.
 let onAuthExpired = null;
 export function registerAuthExpiredHandler(cb) {
   onAuthExpired = cb;
 }
 
+export function unwrapPayload(payload) {
+  let data = payload;
+  while (data && typeof data === 'object' && 'success' in data && 'data' in data) {
+    data = data.data;
+  }
+  return data;
+}
+
 function extractMessage(body, fallback) {
-  const msg = body?.message ?? body?.error;
+  const unwrapped = unwrapPayload(body);
+  const msg = unwrapped?.message ?? body?.message ?? body?.error;
   if (Array.isArray(msg)) return localizeMessage(msg[0], fallback);
   return localizeMessage(msg, fallback);
 }
 
-// ---------- تجديد التوكن (بقفل لمنع تجديدات متزامنة) ----------
 let refreshPromise = null;
 
 async function refreshTokens() {
@@ -53,7 +52,7 @@ async function refreshTokens() {
 
     const text = await res.text();
     const payload = text ? JSON.parse(text) : null;
-    const data = payload?.data ?? payload;
+    const data = unwrapPayload(payload);
     if (!data?.accessToken) return false;
 
     await saveTokens({
@@ -76,19 +75,20 @@ async function ensureRefreshed() {
 }
 
 async function doFetch(path, method, body, headers, withAuth) {
-  const finalHeaders = { 'Content-Type': 'application/json', ...headers };
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const finalHeaders = { ...(isFormData ? {} : { 'Content-Type': 'application/json' }), ...headers };
   if (withAuth) {
     const token = await getAccessToken();
     if (token) finalHeaders.Authorization = `Bearer ${token}`;
   }
-  // مهلة زمنية حتى لا تتجمّد الواجهة عند تعذّر الوصول للخادم
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     return await fetch(`${API_URL}${path}`, {
       method,
       headers: finalHeaders,
-      body: body ? JSON.stringify(body) : undefined,
+      body: body ? (isFormData ? body : JSON.stringify(body)) : undefined,
       signal: controller.signal,
     });
   } finally {
@@ -101,16 +101,14 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
   try {
     res = await doFetch(path, method, body, headers, auth);
   } catch (networkErr) {
-    throw new ApiError('تعذّر الاتصال بالخادم، تحقّق من الشبكة', 0, networkErr);
+    throw new ApiError('تعذّر الاتصال بالخادم، تحقق من الشبكة', 0, networkErr);
   }
 
-  // محاولة تجديد التوكن مرّة واحدة عند 401 لطلب مُصادَق
   if (res.status === 401 && auth && !_retried) {
     const refreshed = await ensureRefreshed();
     if (refreshed) {
       return request(path, { method, body, auth, headers, _retried: true });
     }
-    // فشل التجديد → انتهت الجلسة
     await clearSession();
     if (onAuthExpired) onAuthExpired();
     throw new ApiError('انتهت الجلسة، يرجى تسجيل الدخول من جديد', 401, null);
@@ -131,14 +129,13 @@ async function request(path, { method = 'GET', body, auth = false, headers = {},
     throw new ApiError(message, res.status, payload);
   }
 
-  // فكّ غلاف TransformInterceptor
-  if (payload && typeof payload === 'object' && 'data' in payload && 'success' in payload) {
-    return payload.data;
-  }
-  return payload;
+  return unwrapPayload(payload);
 }
 
 export const api = {
   get: (path, opts) => request(path, { ...opts, method: 'GET' }),
   post: (path, body, opts) => request(path, { ...opts, method: 'POST', body }),
+  patch: (path, body, opts) => request(path, { ...opts, method: 'PATCH', body }),
+  put: (path, body, opts) => request(path, { ...opts, method: 'PUT', body }),
+  delete: (path, opts) => request(path, { ...opts, method: 'DELETE' }),
 };

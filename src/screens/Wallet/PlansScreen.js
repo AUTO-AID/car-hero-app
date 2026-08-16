@@ -1,149 +1,487 @@
 // ============================================================
-//  PlansScreen — ٣٢ · باقات الاشتراك  (القسم I)
+//  PlansScreen — ٣٣ · خطط الاشتراك
+//
+//  شاشة قرار شرائي — تُقاس بالتحويل، لكن **بلا نمط مظلم واحد**: لا مؤقّت
+//  ضغط، ولا «الأكثر شعبية» مختلقة (لا نملك بيانات شعبية أصلاً)، ولا صياغة
+//  تُخجل من يرفض. التوصية الوحيدة المعروضة مبنيّة على رقم يستطيع المستخدم
+//  التحقّق منه بنفسه: أقلّ تكلفة شهرية مكافئة.
+//
+//  حقيقتان من الخادم تحكمان التصميم:
+//   • `SubscribeUserUseCase` **يخصم السعر من رصيد المحفظة** ويرفض بـ
+//     «Insufficient wallet balance» — فالرصيد يُعرض هنا، والنقص يقود إلى
+//     الشحن بدل رسالة فشل بعد الضغط.
+//   • من لديه اشتراك نشط يرفضه `subscribe` («already has an active
+//     subscription») ويحتاج `upgrade` — فنقرّر المسار مسبقاً لا بالمحاولة والخطأ.
 // ============================================================
 
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Car, Crown, CheckCircle, Check } from 'phosphor-react-native';
-import { colors, shadow, gradients } from '../../theme/theme';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ArrowSquareOut, Check, Crown, Info, Minus, Wallet } from "phosphor-react-native";
+import {
+  AppHeader,
+  AsyncContent,
+  ConfirmSheet,
+  EmptyState,
+  ErrorBanner,
+  OutlineButton,
+  PressableScale,
+  PrimaryButton,
+  SkeletonCard,
+  StatusPill,
+} from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import {
+  durationLabel,
+  fetchCurrentSubscription,
+  fetchPlans,
+  findPlan,
+  monthlyEquivalent,
+  planId as idOf,
+  planList,
+  savingsPercent,
+  subscribe,
+  tierLabel,
+  upgradeSubscription,
+} from "../../services/subscriptionsApi";
+import { CURRENCY, fetchWallet } from "../../services/walletApi";
+import { clearPaywallHistory } from "../../services/paywall";
 
-const FREE = [
-  'الخدمات الأساسية فقط',
-  'نقاط أقل عن كل طلب',
-  'دردشة نصية فقط',
-  'توصية ذكية حسب المسافة فقط',
-  'سيارة واحدة فقط',
-  'لا خدمات مجانية سنوية',
-  'انتظار أطول في الخدمة',
-];
-const PREMIUM = [
-  'كل الخدمات (صيانة، غسيل، فتح قفل…)',
-  'نقاط مضاعفة قابلة للتحويل وخصومات',
-  'دردشة متقدمة (نص + صور)',
-  'توصية ذكية حسب التقييمات والأداء',
-  'عدد غير محدود من السيارات',
-  'خدمة مجانية واحدة سنوياً',
-  'أولوية وصول من أقرب فني متاح',
-];
+const arNum = (value) => Number(value || 0).toLocaleString("ar-EG");
+const money = (value) => `${arNum(value)} ${CURRENCY}`;
 
 export default function PlansScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [yearly, setYearly] = useState(false);
+
+  const [plans, setPlans] = useState([]);
+  const [current, setCurrent] = useState(null);
+  const [balance, setBalance] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [autoRenew, setAutoRenew] = useState(true);
+  const [confirming, setConfirming] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [plansResponse, subscription, wallet] = await Promise.all([
+        fetchPlans(true),
+        fetchCurrentSubscription().catch(() => ({ isActive: false, status: null })),
+        fetchWallet().catch(() => null),
+      ]);
+      setPlans(planList(plansResponse));
+      setCurrent(subscription?.isActive ? subscription.status : null);
+      setBalance(Number(wallet?.balance || 0));
+    } catch (loadError) {
+      setError(loadError?.message || "تعذّر جلب خطط الاشتراك");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const sorted = useMemo(
+    () => [...plans].sort((a, b) => Number(a.price || 0) - Number(b.price || 0)),
+    [plans],
+  );
+
+  // التوصية برقم لا بادّعاء: أقلّ تكلفة شهرية مكافئة بين الخطط المدفوعة
+  const recommendedId = useMemo(() => {
+    const paid = sorted.filter((plan) => Number(plan.price) > 0);
+    if (paid.length < 2) return null;
+    const best = paid.reduce((a, b) => (monthlyEquivalent(a) <= monthlyEquivalent(b) ? a : b));
+    return idOf(best);
+  }, [sorted]);
+
+  const currentPlanId = current?.planId || null;
+  const currentPlan = findPlan(sorted, currentPlanId);
+
+  // اتحاد المزايا: صفوف الجدول تُبنى من بيانات الخطط نفسها لا من قائمة مكتوبة يدوياً
+  const featureRows = useMemo(() => {
+    const all = [];
+    sorted.forEach((plan) => {
+      (plan.featuresAr || plan.features || []).forEach((feature) => {
+        if (!all.includes(feature)) all.push(feature);
+      });
+    });
+    return all;
+  }, [sorted]);
+
+  const target = confirming;
+  const shortfall = target ? Math.max(0, Number(target.price || 0) - balance) : 0;
+
+  const startPurchase = (plan) => {
+    setActionError("");
+    setConfirming(plan);
+  };
+
+  const confirmPurchase = async () => {
+    if (busy || !target) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      const id = idOf(target);
+      if (currentPlanId) await upgradeSubscription(id, { autoRenew });
+      else await subscribe(id, { autoRenew });
+      clearPaywallHistory();
+      setConfirming(null);
+      navigation?.navigate?.("MySubscription");
+    } catch (purchaseError) {
+      setConfirming(null);
+      setActionError(purchaseError?.message || "تعذّر إتمام الاشتراك، حاول مجدداً");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <View style={s.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 30 }}>
-        <View style={s.head}>
-          <Pressable style={s.back} onPress={() => navigation?.goBack?.()}><ArrowRight size={20} color={colors.textHeading} /></Pressable>
-          <Text style={s.headTitle}>خطط المستخدمين</Text>
-        </View>
-        <Text style={s.intro}>قارن بين الخطة المجانية والمدفوعة واختر ما يناسبك.</Text>
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xxl },
+        ]}
+      >
+        <AppHeader title="خطط الاشتراك" subtitle="قارن ثم اختر ما يناسبك" onBack={() => navigation?.goBack?.()} />
 
-        {/* التبديل شهري / سنوي */}
-        <View style={s.toggle}>
-          <Pressable style={[s.toggleTab, !yearly && s.toggleTabOn]} onPress={() => setYearly(false)}>
-            <Text style={[s.toggleText, !yearly && s.toggleTextOn]}>شهري · $5</Text>
-          </Pressable>
-          <Pressable style={[s.toggleTab, yearly && s.toggleTabOn]} onPress={() => setYearly(true)}>
-            <Text style={[s.toggleText, yearly && s.toggleTextOn]}>سنوي · $50 <Text style={s.save}>يوفّر ١٧٪</Text></Text>
-          </Pressable>
-        </View>
-
-        {/* الخطة المجانية */}
-        <View style={s.freeCard}>
-          <View style={s.planHead}>
-            <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }}>
-              <View style={s.freeIcon}><Car size={21} weight="fill" color={colors.primaryLight} /></View>
-              <View>
-                <Text style={s.planTitle}>الخطة المجانية</Text>
-                <Text style={s.planSub}>Free</Text>
-              </View>
-            </View>
-            <Text style={s.freePrice}>مجانية</Text>
+        <AsyncContent
+          loading={loading}
+          error={error}
+          hasData={sorted.length > 0}
+          isEmpty={!loading && !error && sorted.length === 0}
+          onRetry={load}
+          errorTitle="تعذّر تحميل الخطط"
+          skeleton={<View style={styles.skeleton}><SkeletonCard lines={3} /><SkeletonCard lines={3} /></View>}
+          empty={{
+            title: "لا توجد خطط متاحة حالياً",
+            message: "أضِف الخطط من لوحة الإدارة أو عُد لاحقاً.",
+            actionLabel: "إعادة المحاولة",
+            onAction: load,
+          }}
+        >
+          <View style={styles.walletRow}>
+            <Wallet size={16} weight="fill" color={colors.primary} />
+            <Text style={styles.walletText}>رصيد محفظتك {money(balance)} — يُخصم منه ثمن الاشتراك</Text>
           </View>
-          <View style={{ gap: 9 }}>
-            {FREE.map((f, i) => (
-              <View key={i} style={s.featRow}>
-                <CheckCircle size={16} weight="fill" color={colors.success} />
-                <Text style={s.featText}>{f}</Text>
-              </View>
+
+          <ErrorBanner message={actionError} style={styles.banner} />
+
+          {/* جدول مقارنة: المقارنة بُعداً بُعد بلا تمرير ذهاباً وإياباً */}
+          <Text style={styles.sectionTitle}>مقارنة سريعة</Text>
+          <View style={styles.table}>
+            <View style={styles.tableHead}>
+              <Text style={[styles.cell, styles.cellLabel, styles.headText]}>البند</Text>
+              {sorted.map((plan) => (
+                <Text key={idOf(plan)} style={[styles.cell, styles.headText]} numberOfLines={2}>
+                  {plan.nameAr || plan.name}
+                </Text>
+              ))}
+            </View>
+
+            <TableRow label="السعر" cells={sorted.map((plan) => (Number(plan.price) > 0 ? money(plan.price) : "مجاناً"))} />
+            <TableRow label="المدّة" cells={sorted.map((plan) => durationLabel(plan))} />
+            <TableRow
+              label="التكلفة الشهرية"
+              cells={sorted.map((plan) => (Number(plan.price) > 0 ? money(monthlyEquivalent(plan)) : "—"))}
+              strong
+            />
+            <TableRow
+              label="التوفير"
+              cells={sorted.map((plan) => {
+                const percent = savingsPercent(plan, sorted);
+                return percent > 0 ? `${arNum(percent)}٪` : "—";
+              })}
+            />
+            {featureRows.map((feature) => (
+              <TableRow
+                key={feature}
+                label={feature}
+                cells={sorted.map((plan) => ((plan.featuresAr || plan.features || []).includes(feature) ? true : false))}
+              />
             ))}
           </View>
-          <View style={s.current}>
-            <Check size={16} weight="bold" color={colors.success} />
-            <Text style={s.currentText}>خطتك الحالية</Text>
-          </View>
-        </View>
 
-        {/* الخطة المدفوعة */}
-        <LinearGradient colors={['#6a1b9a', '#8f5cb1']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.premiumCard}>
-          <View style={s.premiumCircle} />
-          <View style={s.recommended}><Text style={s.recommendedText}>موصى بها</Text></View>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <View style={s.premiumIcon}><Crown size={21} weight="fill" color="#fff" /></View>
-            <View>
-              <Text style={s.premiumTitle}>الخطة المدفوعة</Text>
-              <Text style={s.premiumSub}>Premium</Text>
+          {/* شروط الشراء قبل الشراء لا بعده ولا داخل «الشروط والأحكام» */}
+          <View style={styles.policy}>
+            <Info size={16} weight="fill" color={colors.info} />
+            <View style={styles.policyCopy}>
+              <Text style={styles.policyText}>
+                يُخصم ثمن الاشتراك من رصيد محفظتك فوراً، ويبدأ سريانه في الحال.
+              </Text>
+              <Text style={styles.policyText}>
+                التجديد التلقائي {autoRenew ? "مفعّل" : "متوقّف"} — يمكنك تغييره الآن، أو إيقافه لاحقاً من «اشتراكي».
+              </Text>
+              <Text style={styles.policyText}>
+                عند الإلغاء يبقى اشتراكك فعّالاً حتى نهاية المدّة المدفوعة، ولا يُسترد المبلغ المدفوع.
+              </Text>
             </View>
           </View>
-          <View style={{ marginBottom: 14, flexDirection: 'row-reverse', alignItems: 'baseline', flexWrap: 'wrap' }}>
-            <Text style={s.premiumPrice}>{yearly ? '$50' : '$5'}</Text>
-            <Text style={s.premiumUnit}> / {yearly ? 'سنوياً' : 'شهرياً — أو $50 سنوياً'}</Text>
-          </View>
-          <View style={{ gap: 9 }}>
-            {PREMIUM.map((f, i) => (
-              <View key={i} style={s.featRow}>
-                <CheckCircle size={16} weight="fill" color="#fff" />
-                <Text style={s.featTextLight}>{f}</Text>
+
+          <PressableScale
+            accessibilityRole="checkbox"
+            accessibilityLabel="التجديد التلقائي"
+            accessibilityState={{ checked: autoRenew }}
+            onPress={() => setAutoRenew((value) => !value)}
+            style={styles.renewRow}
+          >
+            <View style={[styles.checkbox, !autoRenew && styles.checkboxOff]}>
+              {autoRenew ? <Check size={14} weight="bold" color={colors.onPrimary} /> : null}
+            </View>
+            <View style={styles.renewCopy}>
+              <Text style={styles.renewTitle}>تجديد تلقائي عند انتهاء المدّة</Text>
+              <Text style={styles.renewHint}>يمكن إيقافه في أي وقت من شاشة «اشتراكي»</Text>
+            </View>
+          </PressableScale>
+
+          <Text style={styles.sectionTitle}>الخطط</Text>
+          {sorted.map((plan) => {
+            const id = idOf(plan);
+            const isCurrent = id === currentPlanId;
+            const recommended = id === recommendedId && !isCurrent;
+            const price = Number(plan.price) || 0;
+            const insufficient = price > balance;
+            return (
+              <View key={id} style={[styles.card, recommended && styles.cardRecommended, isCurrent && styles.cardCurrent]}>
+                <View style={styles.cardHead}>
+                  <View style={styles.cardIcon}><Crown size={20} weight="fill" color={colors.primary} /></View>
+                  <View style={styles.cardCopy}>
+                    <Text style={styles.cardTitle}>{plan.nameAr || plan.name}</Text>
+                    <Text style={styles.cardSub}>
+                      {[tierLabel(plan.tier), durationLabel(plan)].filter(Boolean).join(" · ")}
+                    </Text>
+                  </View>
+                  {isCurrent ? <StatusPill label="خطتك الحالية" tone="success" /> : null}
+                  {recommended ? <StatusPill label="أقل تكلفة شهرية" tone="info" /> : null}
+                </View>
+
+                <View style={styles.priceRow}>
+                  <Text style={styles.price}>{price > 0 ? money(price) : "مجاناً"}</Text>
+                  {price > 0 ? (
+                    <Text style={styles.priceSub}>≈ {money(monthlyEquivalent(plan))} شهرياً</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.features}>
+                  {(plan.featuresAr || plan.features || []).map((feature) => (
+                    <View key={feature} style={styles.featureRow}>
+                      <Check size={14} weight="bold" color={colors.success} />
+                      <Text style={styles.featureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {isCurrent ? (
+                  <OutlineButton label="خطتك الحالية" disabled onPress={() => {}} />
+                ) : insufficient ? (
+                  // النقص يقود إلى الشحن بدل رفض بعد الضغط: الخادم يرفض بلا رصيد كافٍ
+                  <>
+                    <OutlineButton
+                      label={`اشحن ${money(price - balance)} لتشترك`}
+                      icon={<ArrowSquareOut size={16} color={colors.primary} />}
+                      onPress={() => navigation?.navigate?.("TopUp")}
+                    />
+                    <Text style={styles.cardHint}>رصيدك الحالي {money(balance)}</Text>
+                  </>
+                ) : (
+                  <PrimaryButton
+                    label={currentPlanId ? "الانتقال إلى هذه الخطة" : price > 0 ? `اشترك بـ ${money(price)}` : "ابدأ مجاناً"}
+                    onPress={() => startPurchase(plan)}
+                  />
+                )}
               </View>
-            ))}
-          </View>
-          <Pressable onPress={() => navigation?.navigate?.('MySubscription')} style={({ pressed }) => [s.upgrade, pressed && { transform: [{ scale: 0.97 }] }]}>
-            <Text style={s.upgradeText}>الترقية إلى Premium</Text>
-          </Pressable>
-        </LinearGradient>
+            );
+          })}
+
+          {currentPlan ? (
+            <OutlineButton
+              label="إدارة اشتراكي الحالي"
+              onPress={() => navigation?.navigate?.("MySubscription")}
+              style={styles.manage}
+            />
+          ) : null}
+        </AsyncContent>
       </ScrollView>
+
+      <ConfirmSheet
+        visible={!!confirming}
+        title={currentPlanId ? "تأكيد تغيير الخطة" : "تأكيد الاشتراك"}
+        message={
+          target
+            ? `${target.nameAr || target.name} · ${durationLabel(target)}\n` +
+              `${Number(target.price) > 0 ? `يُخصم ${money(target.price)} من محفظتك الآن` : "خطة مجانية — لا خصم"}` +
+              `${shortfall > 0 ? `\nرصيدك لا يكفي (ينقص ${money(shortfall)})` : ""}` +
+              `\nالتجديد التلقائي: ${autoRenew ? "مفعّل" : "متوقّف"}`
+            : ""
+        }
+        confirmLabel="تأكيد"
+        cancelLabel="تراجع"
+        busy={busy}
+        onConfirm={confirmPurchase}
+        onCancel={() => setConfirming(null)}
+      />
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f3fa' },
-  head: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 8 },
-  back: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.soft, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14 },
-  headTitle: { fontSize: 19, fontWeight: '700', color: colors.textDark },
-  intro: { fontSize: 13.5, color: colors.textBody, marginBottom: 16, textAlign: 'right', lineHeight: 22 },
+function TableRow({ label, cells, strong }) {
+  return (
+    <View style={styles.tableRow}>
+      <Text style={[styles.cell, styles.cellLabel, strong && styles.cellStrong]} numberOfLines={3}>{label}</Text>
+      {cells.map((cell, index) => (
+        <View key={index} style={styles.cell}>
+          {typeof cell === "boolean" ? (
+            cell ? (
+              <Check size={16} weight="bold" color={colors.success} />
+            ) : (
+              // «—» لا فراغ: الخانة الفارغة تُقرأ كخطأ عرض لا كغياب ميزة
+              <Minus size={14} weight="bold" color={colors.textMuted2} />
+            )
+          ) : (
+            <Text style={[styles.cellText, strong && styles.cellStrong]} numberOfLines={2}>{cell}</Text>
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
 
-  toggle: { flexDirection: 'row-reverse', gap: 6, backgroundColor: '#eee6f6', borderRadius: 14, padding: 5, marginBottom: 16 },
-  toggleTab: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10 },
-  toggleTabOn: { backgroundColor: colors.primary },
-  toggleText: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
-  toggleTextOn: { color: '#fff', fontWeight: '700' },
-  save: { fontSize: 10, color: colors.success, fontWeight: '700' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.screenH,
+  },
+  skeleton: { gap: spacing.md, marginTop: spacing.lg },
 
-  freeCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 20, padding: 18, marginBottom: 12, ...shadow.soft, shadowOpacity: 0.10 },
-  planHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  freeIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  planTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  planSub: { fontSize: 11.5, color: colors.textMuted, textAlign: 'right' },
-  freePrice: { fontSize: 18, fontWeight: '700', color: colors.textDark },
-  featRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  featText: { flex: 1, fontSize: 12.5, color: colors.textBody, textAlign: 'right' },
-  featTextLight: { flex: 1, fontSize: 12.5, color: '#f0e6f8', textAlign: 'right' },
-  current: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, borderRadius: 14, borderWidth: 1.5, borderColor: colors.borderInput, backgroundColor: '#faf8fd', marginTop: 16 },
-  currentText: { fontSize: 14, fontWeight: '700', color: colors.textMuted },
+  walletRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    backgroundColor: colors.tint,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+  },
+  walletText: { flex: 1, fontSize: font.size.xs, color: colors.primary, textAlign: "right" },
+  banner: { marginTop: spacing.md },
 
-  premiumCard: { position: 'relative', borderRadius: 20, padding: 18, overflow: 'hidden', ...shadow.button, shadowOffset: { width: 0, height: 18 } },
-  premiumCircle: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: '#ffffff14', top: -40, left: -20 },
-  recommended: { position: 'absolute', top: 16, left: 16, backgroundColor: '#fff', borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
-  recommendedText: { fontSize: 10.5, fontWeight: '700', color: colors.primary },
-  premiumIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#ffffff2b', alignItems: 'center', justifyContent: 'center' },
-  premiumTitle: { fontSize: 16, fontWeight: '700', color: '#fff', textAlign: 'right' },
-  premiumSub: { fontSize: 11.5, color: '#eeddfa', textAlign: 'right' },
-  premiumPrice: { fontSize: 26, fontWeight: '700', color: '#fff' },
-  premiumUnit: { fontSize: 12.5, color: '#eeddfa' },
-  upgrade: { height: 48, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  upgradeText: { fontSize: 14.5, fontWeight: '700', color: colors.primary },
+  sectionTitle: {
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+    fontSize: font.size.md,
+    fontWeight: "700",
+    color: colors.textDark,
+    textAlign: "right",
+  },
+
+  table: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    overflow: "hidden",
+  },
+  tableHead: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    backgroundColor: colors.surfaceAlt,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 4,
+  },
+  tableRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    gap: 4,
+  },
+  cell: { flex: 1, minWidth: 0, alignItems: "center", justifyContent: "center" },
+  cellLabel: { flex: 1.5, alignItems: "flex-end" },
+  cellText: { fontSize: font.size.xxs, color: colors.textBody, textAlign: "center" },
+  cellStrong: { fontWeight: "700", color: colors.textDark },
+  headText: { fontSize: font.size.xxs, fontWeight: "700", color: colors.textHeading, textAlign: "center" },
+
+  policy: {
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.infoBg,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  policyCopy: { flex: 1, gap: 4 },
+  policyText: { fontSize: font.size.xs, color: colors.info, textAlign: "right", lineHeight: 19 },
+
+  renewRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 54,
+    marginTop: spacing.md,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    flexShrink: 0,
+    borderRadius: radius.xs,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxOff: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.borderInput },
+  renewCopy: { flex: 1, minWidth: 0 },
+  renewTitle: { fontSize: font.size.sm, fontWeight: "600", color: colors.textDark, textAlign: "right" },
+  renewHint: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right", marginTop: 1 },
+
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.md,
+  },
+  cardRecommended: { borderColor: colors.primary, borderWidth: 1.5 },
+  cardCurrent: { borderColor: colors.success, borderWidth: 1.5 },
+  cardHead: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  cardIcon: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
+    borderRadius: radius.sm,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardCopy: { flex: 1, minWidth: 0 },
+  cardTitle: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  cardSub: { fontSize: font.size.xs, color: colors.textMuted, marginTop: 2, textAlign: "right" },
+  priceRow: { flexDirection: "row-reverse", alignItems: "baseline", gap: spacing.sm },
+  price: { fontSize: font.size.title, fontWeight: "700", color: colors.textDark },
+  priceSub: { fontSize: font.size.xs, color: colors.textMuted },
+  features: { gap: 6 },
+  featureRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  featureText: { flex: 1, fontSize: font.size.xs, color: colors.textBody, textAlign: "right", lineHeight: 19 },
+  cardHint: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "center" },
+
+  manage: { marginTop: spacing.sm },
 });

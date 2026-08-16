@@ -36,3 +36,25 @@ export function serviceName(s) {
 export function serviceDescription(s) {
   return s?.descriptionAr || s?.description || '';
 }
+
+// ============================================================
+//  تصنيفات الخدمة — كانت تُعرض بمعرّفاتها الإنجليزية (battery,
+//  roadside_assistance…) في الفلاتر وملف الفني وتفاصيل الطلب.
+// ============================================================
+const CATEGORY_LABELS = {
+  roadside_assistance: 'مساعدة على الطريق',
+  towing: 'سحب ونقل',
+  battery: 'بطارية',
+  tire: 'إطارات',
+  fuel: 'توصيل وقود',
+  lockout: 'فتح أقفال',
+  maintenance: 'صيانة',
+  car_wash: 'غسيل سيارات',
+  emergency: 'طوارئ',
+};
+
+/** اسم عربي للتصنيف، مع تراجع مقروء لأي تصنيف غير معروف */
+export function categoryLabel(category) {
+  if (!category) return '';
+  return CATEGORY_LABELS[category] || String(category).replace(/_/g, ' ');
+}

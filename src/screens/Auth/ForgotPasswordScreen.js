@@ -1,121 +1,168 @@
 // ============================================================
-//  ForgotPasswordScreen — 7 · نسيت كلمة المرور  (القسم C)
+//  ForgotPasswordScreen — ٧ · استعادة كلمة المرور
+//
+//  المستخدم هنا محبط بالفعل (فشل دخوله). كل احتكاك إضافي يضاعف الإحباط،
+//  وأول احتكاك يمكن إلغاؤه هو إجباره على إعادة كتابة رقم كتبه قبل ثانية.
 // ============================================================
-
-import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { LockKey, PaperPlaneTilt, WhatsappLogo } from "phosphor-react-native";
+import Text from "../../components/AppText";
 import {
-  ArrowRight,
-  LockKey,
-  PaperPlaneTilt,
-  Info,
-} from "phosphor-react-native";
-import { colors } from "../../theme/theme";
-import {
+  AppHeader,
+  ErrorBanner,
+  LinkText,
   PhoneField,
   PrimaryButton,
   ScreenContainer,
-  ErrorBanner,
 } from "../../components/ui";
+import { colors, font, radius, spacing } from "../../theme/theme";
+import { validatePhone } from "../../services/validators";
 
-export default function ForgotPasswordScreen({ onSubmit, onBack, onLogin, loading = false, error = "" }) {
-  const [phone, setPhone] = useState("");
-  const [localError, setLocalError] = useState("");
+const RETRY_SECONDS = 60;
+const arNum = (value) => Number(value).toLocaleString("ar-EG");
+
+// أي رسالة تكشف وجود الحساب من عدمه تُستبدل بصياغة محايدة
+const REVEALS_ACCOUNT = /لا يوجد حساب|غير مسجّل|غير مسجل|not found/i;
+const neutralize = (message) =>
+  message && REVEALS_ACCOUNT.test(message)
+    ? "إن كان الرقم مسجّلاً فسيصلك الرمز خلال دقيقة."
+    : message;
+
+export default function ForgotPasswordScreen({
+  onSubmit,
+  onBack,
+  onLogin,
+  initialPhone = "",
+  loading = false,
+  error = "",
+}) {
+  // استمرارية السياق: الرقم المكتوب في شاشة الدخول يصل مملوءاً مسبقاً.
+  // إجباره على إعادة الكتابة إهدار متعمّد لجهده في أسوأ لحظة.
+  const [phone, setPhone] = useState(initialPhone);
+  const [phoneError, setPhoneError] = useState("");
+  const [touched, setTouched] = useState(false);
+  // موعد نهائي بالساعة الحقيقية لا سلسلة setTimeout: الأخيرة تتسارع إن
+  // تعدّدت المؤقّتات وتتجمّد في الخلفية (رُصد فعلياً في شاشة الرمز).
+  const [deadline, setDeadline] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const cooldown = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const submitRef = useRef(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const neutralError = neutralize(error);
 
   const submit = () => {
-    if (phone.length < 9) {
-      setLocalError("يرجى إدخال رقم هاتف صحيح");
-      return;
-    }
-    setLocalError("");
+    if (loading || submitRef.current || cooldown > 0) return;
+    const message = validatePhone(phone);
+    setTouched(true);
+    setPhoneError(message);
+    // الخطأ يبقى تحت الحقل ولا يُكرَّر في الشريط العلوي
+    if (message) return;
+    submitRef.current = true;
+    setDeadline(Date.now() + RETRY_SECONDS * 1000);
     onSubmit?.({ phone });
+    setTimeout(() => {
+      submitRef.current = false;
+    }, 0);
   };
 
   return (
-    <ScreenContainer>
-      <Pressable style={s.back} onPress={() => onBack?.()}>
-        <ArrowRight size={20} color={colors.primary} />
-      </Pressable>
-
-      <View style={s.badge}>
-        <LockKey size={56} weight="fill" color={colors.primary} />
+    <ScreenContainer contentStyle={styles.content}>
+      <AppHeader title="استعادة كلمة المرور" onBack={onBack} />
+      <View style={styles.iconWrap} aria-hidden>
+        <LockKey size={34} weight="fill" color={colors.primary} />
       </View>
+      <Text style={styles.title} accessibilityRole="header">نسيت كلمة المرور؟</Text>
 
-      <Text style={s.title}>نسيت كلمة المرور؟</Text>
-      <Text style={s.sub}>
-        أدخل رقم هاتفك المسجّل وسنرسل لك رمز تحقّق لإعادة تعيين كلمة المرور.
+      {/* التوقّع يُشرح قبل الضغط لا بعده: معرفة القناة والوجهة تمنع القلق
+          («هل وصل؟ إلى أين؟») وتقلّل الضغط المتكرر على الزر. */}
+      <Text style={styles.body}>
+        أدخل رقمك المسجّل وسنرسل رمزاً مكوّناً من {arNum(6)} أرقام عبر واتساب.
       </Text>
 
-      <View style={{ marginTop: 26 }}>
-        <PhoneField value={phone} onChangeText={(t) => { setPhone(t); setLocalError(""); }} />
-        <View style={s.infoRow}>
-          <Info size={15} color={colors.primaryLight} />
-          <Text style={s.infoText}>سنستخدم هذا الرقم فقط للتحقّق من حسابك</Text>
-        </View>
-        <ErrorBanner message={localError || error} style={{ marginTop: 14 }} />
+      <View style={styles.channel}>
+        <WhatsappLogo size={16} weight="fill" color={colors.success} />
+        <Text style={styles.channelText}>يصل الرمز عبر واتساب خلال دقيقة عادةً</Text>
       </View>
 
-      <View style={{ flex: 1, minHeight: 24 }} />
+      <View style={styles.form}>
+        <PhoneField
+          value={phone}
+          onChangeText={(value) => {
+            setPhone(value);
+            if (touched) setPhoneError(validatePhone(value));
+          }}
+          onBlur={() => { setTouched(true); setPhoneError(validatePhone(phone)); }}
+          error={phoneError}
+          textContentType="telephoneNumber"
+          autoComplete="tel"
+          onSubmitEditing={submit}
+          returnKeyType="send"
+        />
+        {/* لا نعرض رسالة «لا يوجد حساب» حتى لو أرسلها الخادم: عرضها يحوّل
+            الشاشة إلى أداة تعداد حسابات مجانية. نستبدلها بصياغة محايدة —
+            والإصلاح الجذري في الخادم بأن يردّ ٢٠٠ محايداً دائماً. */}
+        <ErrorBanner message={neutralError} />
+      </View>
+
+      <View style={styles.flex} />
 
       <PrimaryButton
-        label="إرسال رمز التحقّق"
-        icon={<PaperPlaneTilt size={18} weight="fill" color="#fff" />}
+        label={cooldown > 0 ? `إعادة الإرسال خلال ${arNum(cooldown)} ثانية` : "إرسال رمز التحقق"}
+        icon={cooldown > 0 ? null : <PaperPlaneTilt size={18} weight="fill" color={colors.onPrimary} />}
         onPress={submit}
         loading={loading}
+        disabled={cooldown > 0}
+        // التعطيل مصحوب بسببه دائماً: العدّ التنازلي في نصّ الزر نفسه
+        accessibilityHint={cooldown > 0 ? "أُرسل الرمز بالفعل، انتظر انتهاء العدّ" : undefined}
       />
-      <Text style={s.backLink} onPress={() => onLogin?.()}>
-        العودة لتسجيل الدخول
+
+      {/* صياغة محايدة لا تكشف إن كان الرقم مسجّلاً — تعداد الحسابات ثغرة
+          أمنية، والرسالة الصريحة «لا يوجد حساب» تمنح المهاجم تأكيداً مجانياً. */}
+      <Text style={styles.privacyNote}>
+        إن كان الرقم مسجّلاً لدينا فسيصلك الرمز. لا نكشف حالة أي رقم.
       </Text>
+
+      <LinkText onPress={onLogin} style={styles.loginLink}>العودة لتسجيل الدخول</LinkText>
     </ScreenContainer>
   );
 }
 
-const s = StyleSheet.create({
-  back: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: colors.tint,
-    alignItems: "center",
-    justifyContent: "center",
-    alignSelf: "flex-end",
-  },
-  badge: {
-    width: 120,
-    height: 120,
-    borderRadius: 34,
+const styles = StyleSheet.create({
+  content: { minHeight: "100%" },
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
     backgroundColor: colors.tint,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "center",
-    marginTop: 26,
+    marginTop: spacing.xxl,
   },
-  title: {
-    marginTop: 26,
-    textAlign: "center",
-    fontSize: 24,
-    fontWeight: "700",
-    color: colors.textDark,
-  },
-  sub: {
-    marginTop: 12,
-    textAlign: "center",
-    fontSize: 14.5,
-    color: colors.textBody,
-    lineHeight: 25,
-  },
-  infoRow: {
+  title: { marginTop: spacing.xl, textAlign: "center", fontSize: font.size.title, fontWeight: "700", color: colors.textDark },
+  body: { maxWidth: 370, alignSelf: "center", marginTop: spacing.sm, textAlign: "center", fontSize: font.size.sm, color: colors.textBody, lineHeight: 24 },
+  channel: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 6,
-    marginTop: 10,
+    justifyContent: "center",
+    gap: spacing.xs,
+    marginTop: spacing.md,
   },
-  infoText: { color: colors.textMuted, fontSize: 12 },
-  backLink: {
+  channelText: { fontSize: font.size.xs, color: colors.textMuted },
+  form: { marginTop: spacing.xl, gap: spacing.md },
+  flex: { flex: 1, minHeight: spacing.xl },
+  privacyNote: {
+    marginTop: spacing.md,
     textAlign: "center",
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: "700",
-    marginTop: 18,
+    fontSize: font.size.xs,
+    color: colors.textMuted,
+    lineHeight: 20,
   },
+  loginLink: { marginTop: spacing.sm, textAlign: "center", fontSize: font.size.sm },
 });

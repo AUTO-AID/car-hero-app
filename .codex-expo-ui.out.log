@@ -1,0 +1,18 @@
+Starting project at E:\all_project\CarHero\newapp2\carApp
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+Waiting on http://localhost:8082
+Logs for your project will appear below.
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% ( 67/137)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% (225/286)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% ( 548/2123)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% (1436/3012)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 73.5% (2140/3479)
+Web .\index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 84.3% (3197/3481)
+Web Bundled 23746ms index.js (3560 modules)
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 281ms index.js (1 module)
+Web .\index.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 196ms index.js (1 module)
+ LOG  [web] Logs will appear in the browser console

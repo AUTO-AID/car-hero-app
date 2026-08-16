@@ -1,17 +1,11 @@
 // ============================================================
-//  location — إحداثيات الجهاز عبر expo-location
-//  يعيد { longitude, latitude } لترسل في coordinates:[lng,lat]
+//  location — واجهة توافقية فقط
+//
+//  كانت هذه الوحدة مصدراً ثانياً مستقلاً للموقع: تطلب الإذن بنفسها في كل
+//  استدعاء، فيُسأل المستخدم مرّات متعدّدة، ويُتجاهَل الموقع الذي اختاره
+//  يدوياً. المنطق كلّه انتقل إلى locationService (المصدر الوحيد)، وبقيت
+//  الصادرات هنا حتى لا تُكسر الشاشات المستوردة منها.
+//
+//  للكود الجديد: استورد من services/locationService مباشرة.
 // ============================================================
-
-import * as Location from 'expo-location';
-
-export async function getDeviceCoords() {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
-    const e = new Error('يرجى السماح بالوصول إلى الموقع لعرض الفنيين القريبين منك');
-    e.code = 'LOCATION_DENIED';
-    throw e;
-  }
-  const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  return { longitude: pos.coords.longitude, latitude: pos.coords.latitude };
-}
+export { getDeviceCoords, getCoords, setManualCoords, getCachedCoords } from "./locationService";

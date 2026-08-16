@@ -1,414 +1,430 @@
-// ============================================================
-//  HomeScreen — ١٣ · الشاشة الرئيسية  (القسم D)
-//  مُوحّدة مع نظام التصميم الجديد (theme/theme.js)
-//  props: { lang, theme, currentUser, onSelectService,
-//           onOpenMapExplore, onOpenOffers, onOpenOrders }
-//  ملاحظة: شريط التنقّل السفلي يُعرض من App.js (BottomTabBar)
-// ============================================================
-
-import React from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   Bell,
-  MapPin,
-  CaretDown,
-  Lightning,
-  Truck,
   CarBattery,
-  Tire,
-  GasPump,
-  Key,
-  Gear,
+  CaretLeft,
   Drop,
-  Funnel,
+  GasPump,
+  Gear,
+  Key,
+  Lightning,
+  MapPin,
+  SquaresFour,
+  Tag,
+  Tire,
+  Truck,
   Wrench,
-  Cpu,
-  Snowflake,
-  SprayBottle,
 } from "phosphor-react-native";
-import { colors, radius, shadow } from "../../theme/theme";
+import {
+  EmptyState,
+  ErrorState,
+  IconButton,
+  PressableScale,
+  SectionHeader,
+  SkeletonList,
+} from "../../components/ui";
+import { colors, font, gradients, layout, radius, shadow, spacing } from "../../theme/theme";
+import { fetchServices, serviceName, servicePrice } from "../../services/servicesApi";
+import { fetchOrders } from "../../services/ordersApi";
+import { ACTIVE_STATUSES, statusLabel } from "../../services/orderStatus";
 
-// الخدمات — كل خدمة مرتبطة بـ id يفهمه ServiceDetailsScreen
-const SERVICES = [
-  { id: "battery", Icon: CarBattery, label: "شحن بطارية" },
-  { id: "tire", Icon: Tire, label: "تبديل إطار" },
-  { id: "fuel", Icon: GasPump, label: "توصيل وقود" },
-  { id: "mechanic", Icon: Key, label: "فتح السيارة" },
-  { id: "emergency", Icon: Gear, label: "ميكانيكي طوارئ" },
-  { id: "mechanic", Icon: Lightning, label: "كهرباء سيارات" },
-  { id: "mechanic", Icon: Drop, label: "غسيل سيارة" },
-  { id: "mechanic", Icon: Funnel, label: "تغيير زيت" },
-  { id: "mechanic", Icon: Wrench, label: "صيانة دورية" },
-  { id: "mechanic", Icon: Cpu, label: "فحص كمبيوتر" },
-  { id: "mechanic", Icon: Snowflake, label: "تكييف السيارة" },
-  { id: "mechanic", Icon: SprayBottle, label: "دهان وسمكرة" },
+const ICONS = {
+  battery: CarBattery,
+  tire: Tire,
+  fuel: GasPump,
+  lockout: Key,
+  car_wash: Drop,
+  towing: Truck,
+  maintenance: Gear,
+  emergency: Lightning,
+};
+
+const QUICK_ACTIONS = [
+  { key: "services", Icon: SquaresFour, label: "كل الخدمات", tone: colors.primary, bg: colors.tint },
+  { key: "providers", Icon: MapPin, label: "المزودون القريبون", tone: colors.secondary, bg: colors.secondarySoft },
+  { key: "offers", Icon: Tag, label: "العروض", tone: colors.accent, bg: colors.accentSoft },
+  { key: "orders", Icon: Truck, label: "طلباتي", tone: colors.info, bg: colors.infoBg },
 ];
 
+const iconFor = (service) => ICONS[service?.category] || Wrench;
+const formatPrice = (value) => Number(value || 0).toLocaleString("ar-EG");
+
 export default function HomeScreen({
-  lang = "ar",
-  theme = "light",
   currentUser,
-  onSelectService,
+  location,
   onOpenMapExplore,
+  onPickLocation,
   onOpenOffers,
   onOpenOrders,
   onOpenCatalog,
   onOpenNotifications,
+  onSelectService,
+  onTrackOrder,
+  unreadCount = 0,
 }) {
   const insets = useSafeAreaInsets();
+  const [services, setServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(true);
+  // خطأ التحميل منفصل عن «لا توجد خدمات»: كان الفشل يُعرض كقائمة فارغة
+  // برسالة «تحقق من الاتصال» حتى عندما يردّ الخادم بنجاح بقائمة فارغة.
+  const [servicesError, setServicesError] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
   const fullName = currentUser?.fullName || "مستخدم";
-  const firstName = fullName.trim().split(/\s+/)[0];
+  const firstName = fullName.trim().split(/\s+/)[0] || "صديقنا";
   const initial = firstName.charAt(0) || "م";
 
-  const pick = (svc) =>
-    onSelectService?.({
-      id: svc.id,
-      title: svc.label,
-      description: svc.label,
-      icon: "🛠️",
-    });
+  const loadServices = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoadingServices(true);
+    setServicesError("");
+    try {
+      const data = await fetchServices();
+      setServices(Array.isArray(data) ? data.slice(0, 6) : []);
+    } catch (e) {
+      setServices([]);
+      setServicesError(e?.message || "تعذر تحميل الخدمات");
+    } finally {
+      setLoadingServices(false);
+    }
+  }, []);
+
+  // الطلب الجاري: صاحبه لا يريد تصفّح خدمات — يريد أن يعرف أين الفني.
+  // فشل جلبه لا يُعرض كخطأ: الشاشة تظلّ صالحة بدونه، وإزعاج المستخدم
+  // برسالة خطأ عن شيء لم يطلبه ضريبة بلا مقابل.
+  const [activeOrder, setActiveOrder] = useState(null);
+  const loadActiveOrder = useCallback(async () => {
+    try {
+      const { orders } = await fetchOrders({ limit: 5 });
+      const list = Array.isArray(orders) ? orders : [];
+      setActiveOrder(list.find((order) => ACTIVE_STATUSES.includes(order?.status)) || null);
+    } catch {
+      setActiveOrder(null);
+    }
+  }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    // السحب للتحديث يحدّث كل المصادر لا الخدمات وحدها
+    await Promise.all([loadServices({ silent: true }), loadActiveOrder()]);
+    setRefreshing(false);
+  }, [loadServices, loadActiveOrder]);
+
+  useEffect(() => { loadServices(); }, [loadServices]);
+  useEffect(() => { loadActiveOrder(); }, [loadActiveOrder]);
+
+  const locationLabel = useMemo(() => {
+    if (location?.address || location?.label) return location.address || location.label;
+    if (location?.latitude && location?.longitude) return "تم تحديد موقعك الحالي";
+    return "حدد موقع الخدمة";
+  }, [location]);
+
+  const quickHandlers = {
+    services: onOpenCatalog,
+    providers: onOpenMapExplore,
+    offers: onOpenOffers,
+    orders: onOpenOrders,
+  };
 
   return (
-    <View style={s.root}>
+    <View style={styles.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          padding: 20,
-          paddingTop: insets.top + 16,
-          paddingBottom: 28,
-        }}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+        }
       >
-        {/* الشريط العلوي */}
-        <View style={s.top}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{initial}</Text>
+        <View style={styles.top}>
+          <View style={styles.avatar} accessibilityLabel={`حساب ${firstName}`}>
+            <Text style={styles.avatarText}>{initial}</Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.hello}>مرحباً، {firstName} 👋</Text>
-            <Text style={s.helloSub}>كيف يمكننا مساعدتك اليوم؟</Text>
+          <View style={styles.greeting}>
+            <Text style={styles.hello}>مرحباً، {firstName}</Text>
+            <Text style={styles.helloSub}>كيف يمكننا مساعدة سيارتك اليوم؟</Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [s.bell, pressed && { transform: [{ scale: 0.92 }] }]}
-            onPress={() => onOpenNotifications?.()}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="الإشعارات"
-          >
-            <Bell size={21} color="#4a4358" />
-            <View style={s.badge} />
-          </Pressable>
+          {/* الشارة تُقرأ كجزء من اسم الزر، فلا تضيع على قارئ الشاشة */}
+          <View>
+            <IconButton
+              label={unreadCount > 0 ? `الإشعارات، ${unreadCount} غير مقروء` : "الإشعارات"}
+              onPress={onOpenNotifications}
+              icon={<Bell size={21} color={colors.textHeading} />}
+            />
+            {unreadCount > 0 && (
+              <View style={styles.badge} pointerEvents="none">
+                <Text style={styles.badgeText} numberOfLines={1}>
+                  {unreadCount > 99 ? "٩٩+" : unreadCount.toLocaleString("ar-EG")}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* شريحة الموقع */}
-        <Pressable style={s.locChip} onPress={() => onOpenMapExplore?.()}>
-          <MapPin size={16} weight="fill" color={colors.primaryLight} />
-          <Text style={s.locText}>دمشق، المزة</Text>
-          <CaretDown size={13} color={colors.primaryLight} />
-        </Pressable>
+        {/* الأولوية المطلقة: من له طلب جارٍ لا يريد تصفّح خدمات — يريد أن
+            يعرف أين الفني ومتى يصل. لذلك تتصدّر البطاقة كل شيء، فوق شريط
+            الموقع والإجراء الأساسي معاً. */}
+        {activeOrder ? (
+          <ActiveOrderCard order={activeOrder} onTrack={() => onTrackOrder?.(activeOrder)} />
+        ) : null}
 
-        {/* البطاقة الرئيسية */}
-        <LinearGradient
-          colors={["#6a1b9a", "#8f5cb1", "#a06fc4"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.hero}
+        {/* كان يفتح خريطة المزوّدين رغم أن نصّه يَعِد بتحديد موقع الخدمة */}
+        <PressableScale
+          style={styles.locationBar}
+          onPress={onPickLocation || onOpenMapExplore}
+          accessibilityRole="button"
+          accessibilityLabel={`موقع الخدمة: ${locationLabel}`}
+          accessibilityHint="يفتح الخريطة لتحديد موقع الخدمة"
         >
-          <View
-            style={[
-              s.heroCircle,
-              { width: 160, height: 160, top: -60, left: -30 },
-            ]}
-          />
-          <View
-            style={[
-              s.heroCircle,
-              {
-                width: 120,
-                height: 120,
-                bottom: -50,
-                left: 60,
-                backgroundColor: "#ffffff12",
-              },
-            ]}
-          />
-          <Truck
-            size={104}
-            weight="fill"
-            color="#ffffff2e"
-            style={{ position: "absolute", left: -6, bottom: -8 }}
-          />
-          <View
-            style={{
-              maxWidth: 210,
-              alignSelf: "flex-end",
-              alignItems: "flex-end",
-            }}
-          >
-            <View style={s.heroPill}>
-              <View style={s.heroDot} />
-              <Text style={s.heroPillText}>خدمة الطوارئ متاحة الآن</Text>
+          <View style={styles.locationIcon}>
+            <MapPin size={18} weight="fill" color={colors.secondary} />
+          </View>
+          <View style={styles.locationCopy}>
+            <Text style={styles.locationLabel}>موقع الخدمة</Text>
+            <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
+          </View>
+          <CaretLeft size={17} color={colors.textMuted} />
+        </PressableScale>
+
+        <LinearGradient {...gradients.primaryDiag} style={styles.hero}>
+          <Truck size={124} weight="fill" color="#FFFFFF1F" style={styles.heroTruck} />
+          <View style={styles.heroContent}>
+            <View style={styles.heroStatus}>
+              <View style={styles.liveDot} />
+              <Text style={styles.heroStatusText}>مساعدة الطريق متاحة</Text>
             </View>
-            <Text style={s.heroTitle}>تعطّلت سيارتك؟</Text>
-            <Text style={s.heroSub}>
-              اطلب المساعدة الآن وسيصل أقرب فني بأسرع وقت.
-            </Text>
-            <Pressable
-              style={s.heroBtn}
-              onPress={() => pick({ id: "emergency", label: "ميكانيكي طوارئ" })}
+            <Text style={styles.heroTitle}>خدمة سريعة عندما تحتاجها</Text>
+            <Text style={styles.heroSub}>اختر المشكلة، ثبّت موقعك، وتابع وصول الفني خطوة بخطوة.</Text>
+            <PressableScale
+              style={styles.heroButton}
+              onPress={onOpenCatalog}
+              feedback="action"
+              accessibilityRole="button"
+              accessibilityLabel="اطلب خدمة الآن"
             >
               <Lightning size={17} weight="fill" color={colors.primary} />
-              <Text style={s.heroBtnText}>طلب مساعدة الآن</Text>
-            </Pressable>
+              <Text style={styles.heroButtonText}>اطلب خدمة الآن</Text>
+            </PressableScale>
           </View>
         </LinearGradient>
 
-        {/* الطلب النشط */}
-        <View style={s.active}>
-          <View style={s.activeIcon}>
-            <CarBattery size={24} weight="fill" color={colors.primary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={s.activeStatusRow}>
-              <View
-                style={[s.activeDot, { backgroundColor: colors.warning }]}
-              />
-              <Text style={s.activeStatus}>طلب قيد التنفيذ</Text>
-            </View>
-            <Text style={s.activeTitle}>فني بطاريات في الطريق</Text>
-            <Text style={s.activeEta}>يصل خلال 12 دقيقة</Text>
-          </View>
-          <Pressable style={s.activeBtn} onPress={() => onOpenOrders?.()}>
-            <Text style={s.activeBtnText}>تتبّع الطلب</Text>
-          </Pressable>
-        </View>
-
-        {/* الخدمات */}
-        <View style={s.sectionHead}>
-          <Text style={s.sectionTitle}>الخدمات</Text>
-          <Text style={s.sectionMore} onPress={() => (onOpenCatalog || onOpenOffers)?.()}>
-            عرض الكل
-          </Text>
-        </View>
-        <View style={s.grid}>
-          {SERVICES.map((svc, i) => (
-            <Pressable key={i} style={s.cell} onPress={() => pick(svc)}>
-              <View style={s.cellTile}>
-                <svc.Icon size={26} weight="fill" color={colors.primaryLight} />
-              </View>
-              <Text style={s.cellLabel}>{svc.label}</Text>
-            </Pressable>
+        <View style={styles.quickGrid}>
+          {/* نستخرج key من العنصر قبل النشر: تمريرها ضمن {...item} يجعل React
+              يحذّر «key prop is being spread into JSX» في كل رسم. */}
+          {QUICK_ACTIONS.map(({ key, ...action }) => (
+            <QuickAction key={key} {...action} onPress={quickHandlers[key]} />
           ))}
         </View>
+
+        <SectionHeader
+          title="الخدمات الأكثر طلباً"
+          actionLabel="عرض الكل"
+          onAction={onOpenCatalog}
+          style={styles.sectionHeader}
+        />
+
+        {loadingServices ? (
+          <SkeletonList count={2} lines={1} />
+        ) : servicesError ? (
+          <ErrorState
+            title="تعذر تحميل الخدمات"
+            message={servicesError}
+            onRetry={() => loadServices()}
+          />
+        ) : services.length === 0 ? (
+          <EmptyState
+            title="لا توجد خدمات متاحة حالياً"
+            message="سنضيف خدمات جديدة قريباً. يمكنك تصفّح كل الخدمات."
+            actionLabel="تحديث"
+            onAction={() => loadServices()}
+            style={styles.emptyState}
+          />
+        ) : (
+          <View style={styles.serviceGrid}>
+            {services.map((service) => {
+              const Icon = iconFor(service);
+              const price = servicePrice(service);
+              return (
+                <PressableScale
+                  key={service.id || service._id}
+                  style={styles.serviceCard}
+                  onPress={() => onSelectService?.(service)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${serviceName(service)}، ${price ? `من ${formatPrice(price)} ليرة` : "السعر حسب الخدمة"}`}
+                >
+                  <View style={styles.serviceIcon}><Icon size={24} weight="fill" color={colors.primary} /></View>
+                  <Text style={styles.serviceTitle} numberOfLines={2}>{serviceName(service)}</Text>
+                  <View style={styles.serviceFoot}>
+                    <Text style={styles.servicePrice}>{price ? `من ${formatPrice(price)} ل.س` : "حسب الخدمة"}</Text>
+                    <CaretLeft size={14} color={colors.textMuted2} />
+                  </View>
+                  {/* المدة التقديرية عنصر قرار كالسعر: غيابها يترك سؤالاً مفتوحاً */}
+                  {service?.estimatedDuration ? (
+                    <Text style={styles.serviceDuration}>
+                      ≈ {formatPrice(service.estimatedDuration)} دقيقة
+                    </Text>
+                  ) : null}
+                </PressableScale>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#f6f3fa" },
+function ActiveOrderCard({ order, onTrack }) {
+  // الحالة معرّبة حصراً عبر statusLabel — ممنوع provider_en_route خاماً
+  const label = statusLabel(order?.status);
+  const service = serviceName(order?.service) || order?.serviceName || "طلب جارٍ";
+  const eta = order?.estimatedArrivalTime ?? order?.eta ?? null;
 
-  top: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
+  return (
+    <PressableScale
+      style={styles.activeCard}
+      onPress={onTrack}
+      feedback="action"
+      accessibilityRole="button"
+      accessibilityLabel={`طلب جارٍ: ${service}، الحالة ${label}. اضغط للتتبّع`}
+    >
+      <View style={styles.activeTop}>
+        <View style={styles.activePulse} />
+        <Text style={styles.activeStatus}>{label}</Text>
+        <Text style={styles.activeTag}>طلب جارٍ</Text>
+      </View>
+      <Text style={styles.activeService} numberOfLines={1}>{service}</Text>
+      <View style={styles.activeFoot}>
+        <Text style={styles.activeEta}>
+          {eta != null ? `الوصول المتوقّع خلال ${formatPrice(eta)} دقيقة` : "جارٍ تحديث وقت الوصول"}
+        </Text>
+        <View style={styles.activeBtn}>
+          <Text style={styles.activeBtnText}>تتبّع الطلب</Text>
+          <CaretLeft size={14} weight="bold" color={colors.onPrimary} />
+        </View>
+      </View>
+    </PressableScale>
+  );
+}
+
+function QuickAction({ Icon, label, tone, bg, onPress }) {
+  return (
+    <PressableScale style={styles.quick} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
+      <View style={[styles.quickIcon, { backgroundColor: bg }]}><Icon size={21} weight="fill" color={tone} /></View>
+      <Text style={styles.quickText} numberOfLines={1}>{label}</Text>
+      <CaretLeft size={15} color={colors.textMuted2} />
+    </PressableScale>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.screenH,
+    paddingBottom: spacing.xxl,
   },
-  avatarText: { color: "#fff", fontWeight: "700", fontSize: 18 },
-  hello: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.textDark,
-    textAlign: "right",
-  },
-  helloSub: {
-    fontSize: 12.5,
-    color: colors.textMuted,
-    marginTop: 1,
-    textAlign: "right",
-  },
-  bell: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow.soft,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-  },
+  top: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
   badge: {
     position: "absolute",
-    top: 9,
-    right: 11,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: -2,
+    left: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     backgroundColor: colors.danger,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: "#fff",
-  },
-
-  locChip: {
-    alignSelf: "flex-end",
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 7,
-    backgroundColor: colors.tint,
-    borderWidth: 1,
-    borderColor: "#e8dcf5",
-    borderRadius: 999,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    marginTop: 16,
-  },
-  locText: { fontSize: 13, fontWeight: "600", color: colors.primary },
-
-  hero: {
-    position: "relative",
-    marginTop: 16,
-    borderRadius: 26,
-    overflow: "hidden",
-    padding: 22,
-    ...shadow.button,
-    shadowOffset: { width: 0, height: 20 },
-    shadowRadius: 40,
-  },
-  heroCircle: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "#ffffff1a",
-  },
-  heroPill: {
-    flexDirection: "row-reverse",
-    alignSelf: "flex-end",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#ffffff26",
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 11,
-    marginBottom: 12,
-  },
-  heroDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#7ee0a9" },
-  heroPillText: { fontSize: 11.5, fontWeight: "600", color: "#fff" },
-  heroTitle: {
-    fontSize: 23,
-    fontWeight: "700",
-    color: "#fff",
-    textAlign: "right",
-  },
-  heroSub: {
-    marginTop: 9,
-    fontSize: 13.5,
-    color: "#f0e6f8",
-    lineHeight: 22,
-    textAlign: "right",
-  },
-  heroBtn: {
-    alignSelf: "flex-end",
-    marginTop: 16,
-    height: 48,
-    paddingHorizontal: 22,
-    borderRadius: 15,
-    backgroundColor: "#fff",
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 8,
-  },
-  heroBtnText: { color: colors.primary, fontSize: 14.5, fontWeight: "700" },
-
-  active: {
-    marginTop: 16,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#eee3f7",
-    borderRadius: 20,
-    padding: 15,
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 12,
-    ...shadow.soft,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-  },
-  activeIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: colors.tint,
     alignItems: "center",
     justifyContent: "center",
   },
-  activeStatusRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 6,
-  },
-  activeDot: { width: 7, height: 7, borderRadius: 4 },
-  activeStatus: { fontSize: 11.5, fontWeight: "700", color: colors.warning },
-  activeTitle: {
-    fontSize: 14.5,
-    fontWeight: "700",
-    color: colors.textDark,
-    marginTop: 3,
-    textAlign: "right",
-  },
-  activeEta: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-    textAlign: "right",
-  },
-  activeBtn: {
-    height: 40,
-    paddingHorizontal: 16,
-    borderRadius: 13,
-    backgroundColor: colors.tint,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  activeBtnText: { color: colors.primary, fontSize: 13, fontWeight: "700" },
+  badgeText: { fontSize: 9.5, fontWeight: "700", color: "#fff", lineHeight: 13 },
+  avatar: { width: 46, height: 46, borderRadius: radius.md, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.onPrimary, fontWeight: "700", fontSize: 17 },
+  greeting: { flex: 1, minWidth: 0 },
+  hello: { fontSize: 17, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  helloSub: { fontSize: font.size.xs, color: colors.textMuted, marginTop: 1, textAlign: "right" },
 
-  sectionHead: {
+  locationBar: {
+    minHeight: 62,
     flexDirection: "row-reverse",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark },
-  sectionMore: { fontSize: 13, fontWeight: "600", color: colors.primaryLight },
-
-  grid: {
-    flexDirection: "row-reverse",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 18,
-  },
-  cell: { width: "22%", alignItems: "center", gap: 7 },
-  cellTile: {
-    width: "100%",
-    aspectRatio: 1,
-    borderRadius: 17,
-    backgroundColor: "#fff",
+    gap: spacing.md,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+    borderRadius: radius.card,
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.lg,
+  },
+  locationIcon: { width: 38, height: 38, borderRadius: radius.sm, backgroundColor: colors.secondarySoft, alignItems: "center", justifyContent: "center" },
+  locationCopy: { flex: 1, minWidth: 0 },
+  locationLabel: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
+  locationText: { fontSize: font.size.sm, fontWeight: "700", color: colors.textHeading, textAlign: "right" },
+
+  hero: { minHeight: 206, borderRadius: radius.lg, overflow: "hidden", padding: spacing.xl, marginTop: spacing.md, ...shadow.button },
+  heroTruck: { position: "absolute", left: -12, bottom: -12 },
+  heroContent: { width: "78%", alignSelf: "flex-end", alignItems: "flex-end" },
+  heroStatus: { flexDirection: "row-reverse", alignItems: "center", gap: 6, marginBottom: spacing.sm },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#7EE0B7" },
+  heroStatusText: { color: "#F5ECFA", fontSize: font.size.xs, fontWeight: "600" },
+  heroTitle: { color: colors.onPrimary, fontSize: 22, fontWeight: "700", textAlign: "right", lineHeight: 32 },
+  heroSub: { color: "#EDE3F2", fontSize: font.size.sm, lineHeight: 22, marginTop: spacing.xs, textAlign: "right" },
+  heroButton: { minHeight: 46, borderRadius: radius.sm, backgroundColor: colors.surface, paddingHorizontal: spacing.lg, flexDirection: "row-reverse", alignItems: "center", justifyContent: "center", gap: spacing.sm, marginTop: spacing.md },
+  heroButtonText: { color: colors.primary, fontWeight: "700", fontSize: font.size.sm },
+
+  quickGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md },
+  quick: { width: "48%", minHeight: 58, flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: 10 },
+  quickIcon: { width: 34, height: 34, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
+  quickText: { flex: 1, minWidth: 0, color: colors.textHeading, fontSize: font.size.xs, fontWeight: "700", textAlign: "right" },
+
+  sectionHeader: { marginTop: spacing.xxl, marginBottom: spacing.md },
+  emptyState: { minHeight: 170 },
+
+  activeCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    ...shadow.button,
+  },
+  activeTop: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  activePulse: { width: 8, height: 8, borderRadius: radius.pill, backgroundColor: colors.successBg },
+  activeStatus: { flex: 1, color: colors.onPrimary, fontSize: font.size.sm, fontWeight: "700", textAlign: "right" },
+  activeTag: {
+    color: colors.primary,
+    backgroundColor: colors.onPrimary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    fontSize: font.size.xxs,
+    fontWeight: "700",
+  },
+  activeService: { color: colors.onPrimary, fontSize: font.size.body, fontWeight: "700", textAlign: "right" },
+  activeFoot: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  activeEta: { flex: 1, color: colors.tint, fontSize: font.size.xs, textAlign: "right" },
+  activeBtn: {
+    minHeight: 36,
+    flexDirection: "row-reverse",
     alignItems: "center",
-    justifyContent: "center",
-    ...shadow.soft,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    gap: spacing.xs,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.onPrimary,
+    paddingHorizontal: spacing.md,
   },
-  cellLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#4a4358",
-    textAlign: "center",
-  },
+  activeBtnText: { color: colors.onPrimary, fontSize: font.size.xs, fontWeight: "700" },
+  serviceDuration: { width: "100%", color: colors.textMuted2, fontSize: font.size.xxs, textAlign: "right", marginTop: 1 },
+  serviceGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm },
+  serviceCard: { width: "48%", minHeight: 132, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md, alignItems: "flex-end" },
+  serviceIcon: { width: 40, height: 40, borderRadius: radius.sm, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center", marginBottom: spacing.sm },
+  serviceTitle: { minHeight: 40, color: colors.textDark, fontSize: font.size.sm, fontWeight: "700", textAlign: "right" },
+  serviceFoot: { width: "100%", flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.xs, marginTop: spacing.xs },
+  servicePrice: { flex: 1, color: colors.textMuted, fontSize: font.size.xxs, fontWeight: "600", textAlign: "right" },
 });

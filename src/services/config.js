@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
 const API_PREFIX = 'api/v1';
-const DEV_PORT = 3000;
+const DEV_PORT = 3001;
 
 // عنوان صريح للـ backend (لبيئة الإنتاج) — يجب أن يكون نصّاً وإلا يُتجاهَل
 function getExplicitBaseUrl() {

@@ -1,168 +1,647 @@
 // ============================================================
-//  BookingScreen — ٢٥ · حجز موعد وجدولة  (القسم G)
+//  BookingScreen — ٢٤ · حجز موعد مسبق
+//
+//  مسار مختلف جوهرياً عن الطلب الفوري: المستخدم غير مستعجل، لكنه يحتاج
+//  **يقيناً بالتوفّر**. الوعد بموعد غير متاح فعلاً أسوأ من عدم عرضه، لذلك
+//  كل فتحة معروضة هنا مبنيّة على قواعد الخادم نفسها (ساعات العمل + مدّة
+//  الخدمة + المستقبل)، وكل فتحة معطّلة تحمل سبب تعطيلها مكتوباً.
+//
+//  ما كان قبل هذه النسخة: أيام وأوقات ثابتة في الكود، ومركز خدمة وهمي،
+//  و«تأكيد الحجز» يستدعي goBack — أي شاشة تعرض وعداً ولا تنشئ حجزاً.
 // ============================================================
 
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Buildings, CaretLeft, CalendarCheck, ArrowsClockwise } from 'phosphor-react-native';
-import { colors, radius, shadow, gradients } from '../../theme/theme';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  CalendarBlank,
+  CalendarCheck,
+  CaretLeft,
+  CaretRight,
+  Clock,
+  Info,
+  Storefront,
+  WarningCircle,
+} from "phosphor-react-native";
+import {
+  AppHeader,
+  AsyncContent,
+  ConfirmSheet,
+  EmptyState,
+  ErrorBanner,
+  OutlineButton,
+  PressableScale,
+  PrimaryButton,
+  SkeletonCard,
+} from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { fetchService, serviceName as serviceNameOf, servicePrice } from "../../services/servicesApi";
+import { fetchProvider } from "../../services/providersApi";
+import { buildOrderBody, createBooking, fetchBookings, isNoProviderError, isSlotConflictError } from "../../services/ordersApi";
+import { ACTIVE_STATUSES } from "../../services/orderStatus";
+import { getCoords } from "../../services/locationService";
+import { qaIs, qaParams } from "../../services/qa";
+import {
+  buildDays,
+  buildSlots,
+  formatDuration,
+  hasPublishedHours,
+  hoursForDay,
+  nextFreeSlot,
+  openDaysSummary,
+} from "../../services/scheduling";
 
-const DAYS = [
-  { d: 'أحد', n: '٦' }, { d: 'إثن', n: '٧' }, { d: 'ثلا', n: '٨' },
-  { d: 'أرب', n: '٩' }, { d: 'خمي', n: '١٠' },
-];
-const TIMES = ['٠٩:٠٠', '١١:٠٠', '١٣:٠٠', '١٥:٠٠', '١٧:٠٠', '١٩:٠٠'];
-const DISABLED = ['١٧:٠٠'];
+const DAYS_AHEAD = 14;
+const DAYS_PER_PAGE = 7;
+const arNum = (value) => Number(value || 0).toLocaleString("ar-EG");
 
-/* مفتاح تبديل */
-function Toggle({ value, onChange }) {
-  return (
-    <Pressable onPress={() => onChange?.(!value)} style={[tg.track, value ? tg.on : tg.off]}>
-      <View style={[tg.knob, value ? tg.knobOn : tg.knobOff]} />
-    </Pressable>
-  );
-}
-const tg = StyleSheet.create({
-  track: { width: 44, height: 26, borderRadius: 999, justifyContent: 'center' },
-  on: { backgroundColor: colors.primaryLight }, off: { backgroundColor: '#e2d7ef' },
-  knob: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
-  knobOn: { left: 3 }, knobOff: { right: 3 },
-});
-
-export default function BookingScreen({ navigation }) {
+export default function BookingScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const [day, setDay] = useState(1);
-  const [time, setTime] = useState('١١:٠٠');
-  const [remind, setRemind] = useState(true);
+  // qaParams تُرجع {} خارج التطوير — تسمح بفحص الشاشة عبر ?qa=bookingNew
+  const params = { ...qaParams(["serviceId", "providerId"]), ...(route?.params || {}) };
+  const { serviceId, providerId } = params;
+
+  // إحداثيات الطلب تصل مع المعطيات من مسار الطلب؛ وإن غابت نستهلك المخزَّن
+  // دون أن نسأل النظام — شاشة التمهيد وحدها تملك حقّ إظهار حوار الإذن.
+  const paramCoords = useMemo(
+    () =>
+      Number.isFinite(params.longitude) && Number.isFinite(params.latitude)
+        ? { longitude: params.longitude, latitude: params.latitude }
+        : null,
+    [params.longitude, params.latitude],
+  );
+
+  const [service, setService] = useState(null);
+  const [provider, setProvider] = useState(null);
+  const [busy, setBusy] = useState([]);
+  const [coords, setCoords] = useState(paramCoords);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [dayKey, setDayKey] = useState(null);
+  const [slotKey, setSlotKey] = useState(null);
+  const [page, setPage] = useState(0);
+  const [confirming, setConfirming] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [suggestion, setSuggestion] = useState(null);
+
+  // اللحظة الحالية تُثبَّت عند التحميل ثم تُحدَّث كل دقيقة: بدونها تبقى فتحة
+  // مضت معروضة كمتاحة حتى يعيد المستخدم فتح الشاشة.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [serviceDoc, providerDoc, bookingsResult, currentCoords] = await Promise.all([
+        serviceId ? fetchService(serviceId) : Promise.resolve(null),
+        providerId ? fetchProvider(providerId) : Promise.resolve(null),
+        // حجوزات المستخدم نفسه: تعارضها معروف لنا مسبقاً فلا داعي لاكتشافه بالرفض
+        fetchBookings({ statuses: ACTIVE_STATUSES.join(","), limit: 50 }).catch(() => ({ bookings: [] })),
+        paramCoords ? Promise.resolve(paramCoords) : getCoords().catch(() => null),
+      ]);
+      setService(serviceDoc);
+      setProvider(providerDoc);
+      setBusy(
+        (bookingsResult?.bookings || [])
+          .filter((booking) => booking?.scheduledAt)
+          .map((booking) => ({
+            startsAt: new Date(booking.scheduledAt),
+            durationMinutes: booking?.metadata?.scheduledDurationMinutes || 60,
+          })),
+      );
+      if (currentCoords) setCoords(currentCoords);
+    } catch (loadError) {
+      setError(loadError?.message || "تعذّر تحضير مواعيد الحجز");
+    } finally {
+      setLoading(false);
+    }
+  }, [serviceId, providerId, paramCoords]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const duration = Number(service?.estimatedDuration) || 60;
+  const days = useMemo(() => buildDays({ now, count: DAYS_AHEAD }), [now]);
+  const day = useMemo(() => days.find((item) => item.key === dayKey) || days[0], [days, dayKey]);
+
+  // مزوّد بلا ساعات عمل منشورة = رفض مؤكّد من الخادم لكل موعد. عرض تقويم
+  // كامل فوقه خداع بصري، فنفصل هذه الحالة إلى مسار خاص بمخارج حقيقية.
+  const providerWithoutHours = !!providerId && !!provider && !hasPublishedHours(provider);
+  const assumed = !providerId || qaIs("assumed");
+
+  const dayHours = useMemo(
+    () => (provider ? hoursForDay(provider.workingHours, day?.weekdayEn) : null),
+    [provider, day],
+  );
+
+  const { slots, closed } = useMemo(
+    () => buildSlots({ day, hours: providerId ? dayHours : null, duration, now, busy, assumed }),
+    [day, dayHours, providerId, duration, now, busy, assumed],
+  );
+
+  const slot = slots.find((item) => item.key === slotKey) || null;
+  const availableCount = slots.filter((item) => !item.disabled).length;
+
+  // اختيار اليوم يُبطل اختيار وقت لم يعد موجوداً — إبقاؤه يجعل الملخّص يكذب
+  useEffect(() => {
+    if (slotKey && !slots.some((item) => item.key === slotKey)) setSlotKey(null);
+  }, [slots, slotKey]);
+
+  const pages = Math.ceil(days.length / DAYS_PER_PAGE);
+  const pageDays = days.slice(page * DAYS_PER_PAGE, page * DAYS_PER_PAGE + DAYS_PER_PAGE);
+
+  const canSubmit = !!slot && !slot.disabled && !!serviceId && Number.isFinite(coords?.longitude);
+
+  // نقرة ثانية قبل اكتمال الإنشاء = حجزان متطابقان وشكوى: الحارس المرجعي
+  // يمنعها لأن تعطيل الزر وحده يعتمد على إعادة رسم غير متزامنة.
+  const submittingRef = useRef(false);
+  const submit = async () => {
+    if (!canSubmit || submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setSubmitError("");
+    setSuggestion(null);
+    try {
+      const body = buildOrderBody({
+        serviceId,
+        longitude: coords.longitude,
+        latitude: coords.latitude,
+        vehicleId: params.vehicleId,
+        providerId,
+        scheduleTime: slot.startsAt.toISOString(),
+        notes: params.notes,
+      });
+      const result = await createBooking(body);
+      setConfirming(false);
+      navigation?.replace?.("ProviderFound", {
+        ...params,
+        orderId: result?.id || result?._id,
+        scheduled: true,
+        scheduleTime: slot.startsAt.toISOString(),
+      });
+    } catch (bookingError) {
+      setConfirming(false);
+      // التعارض ونفاد الفنيين ليسا «خطأ»: لكل منهما بديل فوري، وعرضهما
+      // برسالة عامة يحوّل خطوة قابلة للإنقاذ إلى طريق مسدود.
+      if (isSlotConflictError(bookingError) || isNoProviderError(bookingError)) {
+        setSuggestion(nextFreeSlot(slots, slot.key));
+      }
+      setSubmitError(bookingError?.message || "تعذّر إتمام الحجز، حاول مجدداً");
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const useSuggestion = () => {
+    setSlotKey(suggestion.key);
+    setSuggestion(null);
+    setSubmitError("");
+  };
 
   return (
-    <View style={s.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }}>
-        <View style={s.head}>
-          <Pressable style={s.back} onPress={() => navigation?.goBack?.()}><ArrowRight size={20} color={colors.textHeading} /></Pressable>
-          <Text style={s.headTitle}>حجز موعد صيانة</Text>
-        </View>
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + 120 },
+        ]}
+      >
+        <AppHeader
+          title="حجز موعد مسبق"
+          subtitle="اختر اليوم والوقت المناسبين"
+          onBack={() => navigation?.goBack?.()}
+        />
 
-        {/* مركز الخدمة */}
-        <Text style={s.label}>مركز الخدمة</Text>
-        <View style={s.centerCard}>
-          <View style={s.centerIcon}><Buildings size={22} weight="fill" color={colors.primaryLight} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.centerTitle}>مركز Car Hero — المزة</Text>
-            <Text style={s.centerSub}>دمشق، شارع الجلاء · ٢.١ كم</Text>
-          </View>
-          <CaretLeft size={16} color="#a79fb3" />
-        </View>
+        <AsyncContent
+          loading={loading}
+          error={error}
+          hasData={!loading && !error}
+          onRetry={load}
+          errorTitle="تعذّر تحضير المواعيد"
+          skeleton={
+            <View style={styles.skeleton}>
+              <SkeletonCard lines={2} />
+              <SkeletonCard lines={3} />
+              <SkeletonCard lines={3} />
+            </View>
+          }
+        >
+          {providerWithoutHours ? (
+            <EmptyState
+              icon={<CalendarBlank size={32} color={colors.textMuted2} />}
+              title="هذا المركز لا ينشر ساعات عمله"
+              message="الحجز المسبق لديه غير متاح لأن مواعيده غير معلنة. يمكنك طلب الخدمة الآن، أو الحجز دون تحديد مركز فنترك النظام يختار الأقرب المتاح."
+              actionLabel="احجز دون تحديد مركز"
+              onAction={() => navigation?.navigate?.("Booking", { ...params, providerId: undefined })}
+            />
+          ) : (
+            <>
+              {/* الخدمة والمدّة: النافذة الزمنية لا نقطة البداية — من يحجز
+                  الساعة ١١ يحتاج أن يعرف متى يتحرّر، لا متى يبدأ فقط. */}
+              <View style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View style={styles.cardIcon}><CalendarCheck size={21} weight="fill" color={colors.primary} /></View>
+                  <View style={styles.cardCopy}>
+                    <Text style={styles.cardTitle}>{serviceNameOf(service) || params.serviceName || "الخدمة المطلوبة"}</Text>
+                    <Text style={styles.cardSub}>
+                      مدّة تقديرية {formatDuration(duration)}
+                      {servicePrice(service) ? ` · من ${arNum(servicePrice(service))} ل.س` : ""}
+                    </Text>
+                  </View>
+                </View>
+              </View>
 
-        {/* اليوم */}
-        <Text style={s.label}>اختر اليوم</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }} contentContainerStyle={{ gap: 8, flexDirection: 'row-reverse' }}>
-          {DAYS.map((it, i) => {
-            const on = i === day;
-            return on ? (
-              <Pressable key={i} onPress={() => setDay(i)}>
-                <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.dayCell}>
-                  <Text style={[s.dayName, { color: '#eeddfa' }]}>{it.d}</Text>
-                  <Text style={[s.dayNum, { color: '#fff' }]}>{it.n}</Text>
-                </LinearGradient>
-              </Pressable>
-            ) : (
-              <Pressable key={i} onPress={() => setDay(i)} style={[s.dayCell, s.dayCellOff]}>
-                <Text style={s.dayName}>{it.d}</Text>
-                <Text style={s.dayNum}>{it.n}</Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+              {provider ? (
+                <View style={styles.card}>
+                  <View style={styles.cardHead}>
+                    <View style={styles.cardIcon}><Storefront size={21} weight="fill" color={colors.primary} /></View>
+                    <View style={styles.cardCopy}>
+                      <Text style={styles.cardTitle}>{provider.businessName || "المركز المختار"}</Text>
+                      <Text style={styles.cardSub}>
+                        {openDaysSummary(provider.workingHours).length
+                          ? `يعمل ${arNum(openDaysSummary(provider.workingHours).length)} أيام في الأسبوع`
+                          : "ساعات العمل غير معلنة"}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
 
-        {/* الوقت */}
-        <Text style={s.label}>اختر الوقت</Text>
-        <View style={s.timeGrid}>
-          {TIMES.map((t) => {
-            const disabled = DISABLED.includes(t);
-            const on = t === time && !disabled;
-            return on ? (
-              <Pressable key={t} onPress={() => setTime(t)} style={s.timeCellWrap}>
-                <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.timeCell}>
-                  <Text style={[s.timeText, { color: '#fff' }]}>{t}</Text>
-                </LinearGradient>
-              </Pressable>
-            ) : (
-              <Pressable key={t} disabled={disabled} onPress={() => setTime(t)} style={[s.timeCellWrap, s.timeCellPlain, disabled && s.timeCellDisabled]}>
-                <Text style={[s.timeText, disabled && { color: '#c3bace' }]}>{t}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              {/* إفصاح صريح عن حدود ما نعرفه: ادّعاء يقين لا نملكه يُنتج وعداً
+                  يُخلَف عند التأكيد، وهو أسوأ من الاعتراف المسبق. */}
+              {assumed ? (
+                <View style={styles.note} accessibilityRole="alert">
+                  <Info size={17} weight="fill" color={colors.info} />
+                  <Text style={styles.noteText}>
+                    المواعيد المعروضة تقديرية — يُختار المركز الأقرب المتاح ويُؤكَّد التوفّر لحظة الحجز.
+                  </Text>
+                </View>
+              ) : null}
 
-        {/* الموعد المختار */}
-        <View style={s.summary}>
-          <View style={s.summaryHead}>
-            <CalendarCheck size={20} weight="fill" color={colors.primaryLight} />
-            <Text style={s.summaryTitle}>موعدك المختار</Text>
-          </View>
-          <Text style={s.summarySub}>الإثنين {DAYS[day].n} تموز · الساعة {time}</Text>
-        </View>
+              {/* الأيام: شبكة لا شريط أفقي — الشريط الأفقي لا يُسحب بالفأرة
+                  على الويب، فتبقى أيامه الأخيرة غير قابلة للوصول أصلاً. */}
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>اختر اليوم</Text>
+                <View style={styles.pager}>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel="الأسبوع السابق"
+                    accessibilityState={{ disabled: page === 0 }}
+                    disabled={page === 0}
+                    onPress={() => setPage((value) => Math.max(0, value - 1))}
+                    style={[styles.pagerBtn, page === 0 && styles.pagerBtnOff]}
+                  >
+                    <CaretRight size={15} weight="bold" color={page === 0 ? colors.textMuted2 : colors.primary} />
+                  </PressableScale>
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel="الأسبوع التالي"
+                    accessibilityState={{ disabled: page >= pages - 1 }}
+                    disabled={page >= pages - 1}
+                    onPress={() => setPage((value) => Math.min(pages - 1, value + 1))}
+                    style={[styles.pagerBtn, page >= pages - 1 && styles.pagerBtnOff]}
+                  >
+                    <CaretLeft size={15} weight="bold" color={page >= pages - 1 ? colors.textMuted2 : colors.primary} />
+                  </PressableScale>
+                </View>
+              </View>
 
-        {/* تذكير دوري */}
-        <View style={s.remind}>
-          <View style={s.remindIcon}><ArrowsClockwise size={22} weight="fill" color={colors.primary} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.remindTitle}>تذكير دوري كل ٣ أشهر</Text>
-            <Text style={s.remindSub}>نذكّرك تلقائياً بموعد الصيانة القادم</Text>
-          </View>
-          <Toggle value={remind} onChange={setRemind} />
-        </View>
+              <View style={styles.dayGrid}>
+                {pageDays.map((item) => {
+                  const active = item.key === day?.key;
+                  const dayClosed = !!providerId && hoursForDay(provider?.workingHours, item.weekdayEn)?.isClosed;
+                  return (
+                    <PressableScale
+                      key={item.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.fullLabel}${dayClosed ? "، مغلق" : ""}`}
+                      accessibilityState={{ selected: active, disabled: !!dayClosed }}
+                      disabled={!!dayClosed}
+                      onPress={() => { setDayKey(item.key); setSlotKey(null); }}
+                      style={[styles.dayCell, active && styles.dayCellActive, dayClosed && styles.cellDisabled]}
+                    >
+                      <Text style={[styles.dayName, active && styles.dayNameActive]} numberOfLines={1}>{item.dayLabel}</Text>
+                      <Text style={[styles.dayNumber, active && styles.dayNumberActive]}>{item.numberLabel}</Text>
+                      <Text style={[styles.dayMonth, active && styles.dayNameActive]} numberOfLines={1}>
+                        {dayClosed ? "مغلق" : item.monthLabel}
+                      </Text>
+                    </PressableScale>
+                  );
+                })}
+              </View>
+
+              <View style={styles.sectionHead}>
+                <Text style={styles.sectionTitle}>اختر الوقت</Text>
+                <Text style={styles.sectionMeta}>
+                  {closed ? "" : `${arNum(availableCount)} من ${arNum(slots.length)} متاح`}
+                </Text>
+              </View>
+
+              {closed || !slots.length ? (
+                <EmptyState
+                  icon={<Clock size={30} color={colors.textMuted2} />}
+                  title={closed ? "المركز مغلق في هذا اليوم" : "لا مواعيد تتّسع في هذا اليوم"}
+                  message={
+                    closed
+                      ? "اختر يوماً آخر من الأيام المفتوحة أعلاه."
+                      : `مدّة الخدمة ${formatDuration(duration)} ولا تتّسع ضمن ساعات العمل المتبقّية.`
+                  }
+                />
+              ) : (
+                <View style={styles.timeGrid}>
+                  {slots.map((item) => {
+                    const active = item.key === slotKey;
+                    return (
+                      <PressableScale
+                        key={item.key}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          item.disabled
+                            ? `${item.label}، غير متاح: ${item.reason}`
+                            : `${item.label} حتى ${item.endLabel}`
+                        }
+                        accessibilityState={{ selected: active, disabled: item.disabled }}
+                        disabled={item.disabled}
+                        onPress={() => { setSlotKey(item.key); setSubmitError(""); setSuggestion(null); }}
+                        style={[styles.timeCell, active && styles.timeCellActive, item.disabled && styles.cellDisabled]}
+                      >
+                        <Text style={[styles.timeText, active && styles.timeTextActive, item.disabled && styles.textDisabled]}>
+                          {item.label}
+                        </Text>
+                        {/* سبب التعطيل مكتوب داخل الفتحة: زرّ باهت بلا تفسير
+                            يُقرأ كعطل في التطبيق لا كقيد في الواقع. */}
+                        {item.disabled ? <Text style={styles.timeReason}>{item.reason}</Text> : null}
+                      </PressableScale>
+                    );
+                  })}
+                </View>
+              )}
+
+              {slot ? (
+                <View style={styles.summary}>
+                  <Text style={styles.summaryTitle}>ملخّص الحجز</Text>
+                  <SummaryRow label="اليوم" value={day.fullLabel} />
+                  <SummaryRow label="الوقت" value={`${slot.label} — ${slot.endLabel}`} />
+                  <SummaryRow label="المدّة" value={formatDuration(duration)} />
+                  <SummaryRow label="الخدمة" value={serviceNameOf(service) || params.serviceName || "—"} />
+                  <SummaryRow label="المركز" value={provider?.businessName || "الأقرب المتاح"} />
+                  <SummaryRow
+                    label="السعر التقديري"
+                    value={servicePrice(service) ? `${arNum(servicePrice(service))} ل.س` : "يُحدَّد بعد المعاينة"}
+                  />
+                  {slot.soon ? (
+                    <View style={styles.warn}>
+                      <WarningCircle size={16} weight="fill" color={colors.warning} />
+                      <Text style={styles.warnText}>
+                        الموعد خلال أقل من ساعتين — قد لا يكفي الوقت لوصول الفني. اختر موعداً أبعد إن أمكن.
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {submitError ? <ErrorBanner message={submitError} style={styles.banner} /> : null}
+              {suggestion ? (
+                <OutlineButton
+                  label={`احجز ${suggestion.label} بدلاً منه`}
+                  onPress={useSuggestion}
+                  style={styles.suggestion}
+                />
+              ) : null}
+
+              {!Number.isFinite(coords?.longitude) ? (
+                <OutlineButton
+                  label="تحديد موقعي لإتمام الحجز"
+                  onPress={async () => {
+                    // إيماءة صريحة من المستخدم — وحدها يُسمح لها بإظهار حوار الإذن
+                    try { setCoords(await getCoords({ allowRequest: true, force: true })); }
+                    catch (locationError) { setSubmitError(locationError?.message || "تعذّر تحديد الموقع"); }
+                  }}
+                  style={styles.suggestion}
+                />
+              ) : null}
+            </>
+          )}
+        </AsyncContent>
       </ScrollView>
 
-      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable onPress={() => navigation?.goBack?.()} style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}>
-          <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.cta, shadow.button]}>
-            <Text style={s.ctaText}>تأكيد الحجز</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+      {!loading && !error && !providerWithoutHours ? (
+        <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
+          <PrimaryButton
+            label={slot ? `تأكيد الحجز · ${slot.label}` : "اختر موعداً أولاً"}
+            disabled={!canSubmit}
+            loading={submitting}
+            style={styles.cta}
+            onPress={() => setConfirming(true)}
+            accessibilityHint={
+              !slot
+                ? "اختر يوماً ووقتاً من الشبكة أعلاه"
+                : !Number.isFinite(coords?.longitude)
+                  ? "يلزم تحديد الموقع قبل إتمام الحجز"
+                  : undefined
+            }
+          />
+          {/* سبب التعطيل مكتوب لا مُستنتَج: زر معطّل صامت يوقف المستخدم بلا مخرج */}
+          {!canSubmit ? (
+            <Text style={styles.bottomHint}>
+              {!slot ? "اختر يوماً ووقتاً لإتمام الحجز" : "يلزم تحديد موقعك لإتمام الحجز"}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      <ConfirmSheet
+        visible={confirming}
+        title="تأكيد الحجز"
+        message={
+          slot
+            ? `${day.fullLabel} · ${slot.label} حتى ${slot.endLabel}\n${serviceNameOf(service) || params.serviceName || ""}${provider?.businessName ? ` — ${provider.businessName}` : ""}`
+            : ""
+        }
+        confirmLabel="نعم، احجز"
+        cancelLabel="تراجع"
+        busy={submitting}
+        onConfirm={submit}
+        onCancel={() => setConfirming(false)}
+      />
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f3fa' },
-  head: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 20 },
-  back: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.soft, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14 },
-  headTitle: { fontSize: 19, fontWeight: '700', color: colors.textDark },
+function SummaryRow({ label, value }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
 
-  label: { fontSize: 13, fontWeight: '700', color: colors.textMuted, marginBottom: 8, textAlign: 'right' },
-  centerCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 13, marginBottom: 18 },
-  centerIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  centerTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  centerSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, textAlign: 'right' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.screenH,
+  },
+  skeleton: { gap: spacing.md, marginTop: spacing.lg },
 
-  dayCell: { width: 58, alignItems: 'center', borderRadius: 14, paddingVertical: 11 },
-  dayCellOff: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border },
-  dayName: { fontSize: 11, color: colors.textMuted },
-  dayNum: { fontSize: 17, fontWeight: '700', color: colors.textDark, marginTop: 2 },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  cardHead: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
+  cardIcon: {
+    width: 42,
+    height: 42,
+    flexShrink: 0,
+    borderRadius: radius.sm,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardCopy: { flex: 1, minWidth: 0 },
+  cardTitle: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  cardSub: { marginTop: 2, fontSize: font.size.xs, color: colors.textMuted, textAlign: "right" },
 
-  timeGrid: { flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginBottom: 20 },
-  timeCellWrap: { width: '31.5%' },
-  timeCell: { borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  timeCellPlain: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingVertical: 11, alignItems: 'center' },
-  timeCellDisabled: { backgroundColor: '#f3eff8' },
-  timeText: { fontSize: 13, fontWeight: '600', color: '#4a4358' },
+  note: {
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.infoBg,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  noteText: { flex: 1, fontSize: font.size.xs, color: colors.info, textAlign: "right", lineHeight: 19 },
 
-  summary: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 18, padding: 16, ...shadow.soft, shadowOpacity: 0.10 },
-  summaryHead: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10, marginBottom: 8 },
-  summaryTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark },
-  summarySub: { fontSize: 13, color: colors.textBody, textAlign: 'right' },
+  sectionHead: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    marginBottom: spacing.sm,
+  },
+  sectionTitle: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  sectionMeta: { fontSize: font.size.xs, color: colors.textMuted },
+  pager: { flexDirection: "row-reverse", gap: spacing.sm },
+  pagerBtn: {
+    width: layout.touchTarget,
+    height: layout.touchTarget,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pagerBtnOff: { backgroundColor: colors.surfaceAlt, borderColor: colors.borderSoft },
 
-  remind: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, backgroundColor: colors.tint, borderWidth: 1, borderColor: '#e8dcf5', borderRadius: 16, padding: 14, marginTop: 12 },
-  remindIcon: { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  remindTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  remindSub: { fontSize: 12, color: colors.textBody, marginTop: 2, textAlign: 'right' },
+  dayGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm },
+  dayCell: {
+    width: "22.4%",
+    minHeight: 72,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 2,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    backgroundColor: colors.surface,
+  },
+  dayCellActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  dayName: { fontSize: font.size.xxs, color: colors.textMuted },
+  dayNameActive: { color: colors.primarySoft },
+  dayNumber: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark },
+  dayNumberActive: { color: colors.onPrimary },
+  dayMonth: { fontSize: font.size.xxs, color: colors.textMuted2 },
 
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 20, paddingTop: 14, backgroundColor: '#f6f3fa' },
-  cta: { height: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  timeGrid: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm },
+  timeCell: {
+    width: "31.5%",
+    minHeight: layout.touchTarget,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    backgroundColor: colors.surface,
+  },
+  timeCellActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  timeText: { fontSize: font.size.sm, fontWeight: "600", color: colors.textHeading },
+  timeTextActive: { color: colors.onPrimary },
+  timeReason: { marginTop: 1, fontSize: font.size.xxs, color: colors.textMuted2 },
+  cellDisabled: { backgroundColor: colors.surfaceAlt, borderColor: colors.borderSoft },
+  textDisabled: { color: colors.textMuted2 },
+
+  summary: {
+    marginTop: spacing.xl,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    padding: spacing.md,
+  },
+  summaryTitle: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right", marginBottom: spacing.sm },
+  summaryRow: {
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingVertical: 5,
+  },
+  summaryLabel: { flexShrink: 0, fontSize: font.size.sm, color: colors.textMuted },
+  summaryValue: { flex: 1, fontSize: font.size.sm, fontWeight: "600", color: colors.textDark, textAlign: "left" },
+  warn: {
+    flexDirection: "row-reverse",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.warningBg,
+    borderRadius: radius.sm,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  warnText: { flex: 1, fontSize: font.size.xs, color: colors.warning, textAlign: "right", lineHeight: 19 },
+
+  banner: { marginTop: spacing.md },
+  suggestion: { marginTop: spacing.sm },
+
+  bottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    paddingHorizontal: spacing.screenH,
+    paddingTop: spacing.md,
+    backgroundColor: colors.screenBg,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  cta: { maxWidth: layout.contentMaxWidth },
+  bottomHint: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    marginTop: 6,
+    fontSize: font.size.xs,
+    color: colors.textMuted,
+    textAlign: "center",
+  },
 });

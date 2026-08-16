@@ -1,258 +1,131 @@
 // ============================================================
-//  AddVehicleScreen — ٢٧ · إضافة / تعديل مركبة  (القسم H)
+//  AddVehicleScreen — ٢٨ · إضافة مركبة
+//
+//  نموذج إدخال يُقاس بمعدّل الإكمال وزمنه ونسبة أخطائه — لا بشكله. لذلك
+//  الشاشة صارت غلافاً رقيقاً حول `VehicleForm` المشترك، وكل حقل له مجموعة
+//  قيم معروفة يُملأ باختيار لا بكتابة.
+//
+//  ما كان قبلها: ستة حقول نصّية حرّة (شركة، طراز، سنة، لون…) تُنتج بيانات
+//  متباعدة، وبطاقة CTA متدرّجة مرسومة يدوياً بألوان خارج `theme.js`.
 // ============================================================
 
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  Pressable,
-  StyleSheet,
-} from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import {
-  ArrowRight,
-  Car,
-  CaretDown,
-  IdentificationCard,
-  Check,
-} from "phosphor-react-native";
-import { colors, radius, shadow, gradients } from "../../theme/theme";
+import { AppHeader, AsyncContent, EmptyState, SkeletonCard } from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { MAX_VEHICLES, createVehicle, fetchMyVehicles, updateVehicle } from "../../services/vehiclesApi";
+import VehicleForm from "./VehicleForm";
 
-/* حقل عام */
-function Field({ label, children }) {
-  return (
-    <View>
-      <Text style={s.label}>{label}</Text>
-      <View style={s.field}>{children}</View>
-    </View>
-  );
-}
+const DRAFT_KEY = "vehicle-new";
 
-export default function AddVehicleScreen({ navigation }) {
+export default function AddVehicleScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const [make, setMake] = useState("هوا");
-  const [model, setModel] = useState("سيراتو");
-  const [year, setYear] = useState("٢٠٢٠");
-  const [color, setColor] = useState("فضّي");
-  const [plate, setPlate] = useState("دمشق ١٢٣٤٥٦");
-  const [vin, setVin] = useState("");
-  const [isDefault, setIsDefault] = useState(true);
+  const vehicle = route?.params?.vehicle || null;
+  const editing = !!vehicle;
+
+  const [count, setCount] = useState(null);
+  const [loading, setLoading] = useState(!editing);
+  const [error, setError] = useState("");
+
+  // عدد المركبات يقرّر أمرين: هل بلغ المستخدم الحدّ (فيُمنع مبكراً بدل رفض
+  // بعد ملء النموذج كاملاً)، وهل هذه أوّل مركبة (فتصير افتراضية تلقائياً).
+  const load = useCallback(async () => {
+    if (editing) return;
+    setLoading(true);
+    setError("");
+    try {
+      const list = await fetchMyVehicles();
+      setCount(Array.isArray(list) ? list.length : 0);
+    } catch (loadError) {
+      setError(loadError?.message || "تعذّر تحضير النموذج");
+    } finally {
+      setLoading(false);
+    }
+  }, [editing]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (body) => {
+    if (editing) await updateVehicle(vehicle.id || vehicle._id, body);
+    else await createVehicle(body);
+    navigation?.goBack?.();
+  };
+
+  const atLimit = !editing && count != null && count >= MAX_VEHICLES;
 
   return (
-    <View style={s.root}>
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          padding: 20,
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 110,
-        }}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xxl },
+        ]}
       >
-        <View style={s.head}>
-          <Pressable style={s.back} onPress={() => navigation?.goBack?.()}>
-            <ArrowRight size={20} color={colors.textHeading} />
-          </Pressable>
-          <Text style={s.headTitle}>إضافة مركبة</Text>
-        </View>
+        <AppHeader
+          title={editing ? "تعديل المركبة" : "إضافة مركبة"}
+          subtitle={editing ? vehicle.plateNumber || "" : "الاختيار من القوائم أسرع من الكتابة"}
+          onBack={() => navigation?.goBack?.()}
+        />
 
-        <View style={{ gap: 16 }}>
-          <Field label="الشركة المصنّعة">
-            <Car size={19} color={colors.primaryLight} />
-            <TextInput
-              value={make}
-              onChangeText={setMake}
-              placeholder="الشركة"
-              placeholderTextColor={colors.textMuted2}
-              textAlign="right"
-              style={s.input}
-            />
-            <CaretDown size={15} color="#a79fb3" />
-          </Field>
-
-          <Field label="الطراز">
-            <TextInput
-              value={model}
-              onChangeText={setModel}
-              placeholder="الطراز"
-              placeholderTextColor={colors.textMuted2}
-              textAlign="right"
-              style={s.input}
-            />
-          </Field>
-
-          <View style={{ flexDirection: "row-reverse", gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Field label="سنة الصنع">
-                <TextInput
-                  value={year}
-                  onChangeText={setYear}
-                  keyboardType="numeric"
-                  placeholder="السنة"
-                  placeholderTextColor={colors.textMuted2}
-                  textAlign="right"
-                  style={s.input}
-                />
-              </Field>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Field label="اللون">
-                <View style={s.swatch} />
-                <TextInput
-                  value={color}
-                  onChangeText={setColor}
-                  placeholder="اللون"
-                  placeholderTextColor={colors.textMuted2}
-                  textAlign="right"
-                  style={s.input}
-                />
-              </Field>
-            </View>
-          </View>
-
-          <Field label="رقم اللوحة">
-            <IdentificationCard size={19} color={colors.primaryLight} />
-            <TextInput
-              value={plate}
-              onChangeText={setPlate}
-              placeholder="رقم اللوحة"
-              placeholderTextColor={colors.textMuted2}
-              textAlign="right"
-              style={s.input}
-            />
-          </Field>
-
-          <Field label="رقم الهيكل VIN (اختياري)">
-            <TextInput
-              value={vin}
-              onChangeText={setVin}
-              placeholder="١٧ خانة"
-              placeholderTextColor={colors.textMuted2}
-              textAlign="right"
-              style={[s.input, { fontSize: 13 }]}
-            />
-          </Field>
-
-          {/* مركبة افتراضية */}
-          <Pressable style={s.checkRow} onPress={() => setIsDefault((v) => !v)}>
-            <View style={[s.checkbox, !isDefault && s.checkboxOff]}>
-              {isDefault ? (
-                <Check size={15} weight="bold" color="#fff" />
-              ) : null}
-            </View>
-            <Text style={s.checkText}>تعيين كمركبة افتراضية</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-
-      <View style={[s.bottom, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
-          onPress={() => navigation?.goBack?.()}
-          style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}
+        <AsyncContent
+          loading={loading}
+          error={error}
+          hasData={editing || count != null}
+          onRetry={load}
+          errorTitle="تعذّر تحضير النموذج"
+          skeleton={<View style={styles.skeleton}><SkeletonCard lines={3} /><SkeletonCard lines={3} /></View>}
         >
-          <LinearGradient
-            colors={gradients.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[s.cta, shadow.button]}
-          >
-            <Text style={s.ctaText}>حفظ المركبة</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
-    </View>
+          {atLimit ? (
+            <EmptyState
+              title="وصلت إلى الحد الأقصى"
+              message={`يمكن حفظ ${MAX_VEHICLES.toLocaleString("ar-EG")} مركبات كحد أقصى. احذف مركبة لم تعد تستخدمها لتتمكّن من إضافة أخرى.`}
+              actionLabel="إدارة مركباتي"
+              onAction={() => navigation?.goBack?.()}
+            />
+          ) : (
+            <View style={styles.formWrap}>
+              <VehicleForm
+                initial={vehicle}
+                // المسوّدة للإضافة فقط: استعادة «مسوّدة» فوق مركبة قائمة أثناء
+                // التعديل تعني الكتابة على بياناتها الحقيقية بلا طلب المستخدم.
+                draftKey={editing ? null : DRAFT_KEY}
+                isFirstVehicle={!editing && count === 0}
+                submitLabel={editing ? "حفظ التعديلات" : "حفظ المركبة"}
+                onSubmit={save}
+              />
+              <Text style={styles.hint}>
+                {editing
+                  ? "التعديل يسري فوراً على الطلبات الجديدة، ولا يغيّر بيانات طلبات سابقة."
+                  : "البيانات تُستخدم لتحديد سيارتك عند وصول الفني — كلّما دقّت، أسرع التعرّف عليها."}
+              </Text>
+            </View>
+          )}
+        </AsyncContent>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#f6f3fa" },
-  head: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 22,
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.screenH,
   },
-  back: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    ...shadow.soft,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.14,
+  skeleton: { gap: spacing.md, marginTop: spacing.lg },
+  formWrap: { marginTop: spacing.lg, gap: spacing.md },
+  hint: {
+    fontSize: font.size.xs,
+    color: colors.textMuted,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
   },
-  headTitle: { fontSize: 19, fontWeight: "700", color: colors.textDark },
-
-  label: {
-    fontSize: 13.5,
-    fontWeight: "600",
-    color: "#4a4358",
-    marginBottom: 8,
-    textAlign: "right",
-  },
-  field: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 10,
-    height: 54,
-    paddingHorizontal: 15,
-    backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#ece6f3",
-    borderRadius: 15,
-  },
-  input: {
-    flex: 1,
-    minWidth: 0,
-    fontSize: 14.5,
-    color: "#2a2333",
-    padding: 0,
-    textAlign: "right",
-  },
-  swatch: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#c0c4cc",
-    borderWidth: 1,
-    borderColor: colors.dotInactive,
-  },
-
-  checkRow: { flexDirection: "row-reverse", alignItems: "center", gap: 11 },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxOff: {
-    backgroundColor: "#fff",
-    borderWidth: 1.5,
-    borderColor: colors.borderInput,
-  },
-  checkText: { fontSize: 13.5, color: "#4a4358" },
-
-  bottom: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    backgroundColor: "#f6f3fa",
-  },
-  cta: {
-    height: 56,
-    borderRadius: radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ctaText: { color: "#fff", fontSize: 16, fontWeight: "600" },
 });

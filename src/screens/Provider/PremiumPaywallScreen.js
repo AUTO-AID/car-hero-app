@@ -1,71 +1,213 @@
 // ============================================================
-//  PremiumPaywallScreen — ٤٤ · نافذة Premium المنبثقة  (القسم K)
-//  تُعرض كطبقة فوق الشاشة؛ الضغط على الخلفية يغلقها.
+//  PremiumPaywallScreen — ٣٥ · جدار الاشتراك المدفوع
+//
+//  لحظة حسّاسة: المستخدم أراد شيئاً فمُنع منه. التنفيذ السيّئ هنا لا يفقد
+//  بيعاً فحسب — يفقد مستخدماً. لذلك القواعد هنا صارمة:
+//   • **السعر حقيقي من `/subscriptions/plans`** — كان مكتوباً «$5 / شهرياً»:
+//     عملة خاطئة وسعر لا وجود له في أي خطة.
+//   • **العرض مربوط بما حاول فعله بالضبط** عبر `route.params.feature`.
+//   • **الإغلاق بضغطة واحدة سهلة**: زر ٤٤px ظاهر أعلى الورقة، والخلفية،
+//     ونصّ محايد أسفلها — بلا صياغة تُخجل («لا، أفضّل دفع المزيد»).
+//   • **بديل مجاني معروض** حتى لا يخرج المستخدم بخُفَّي حُنين.
+//   • **حدّ تكرار** عبر `services/paywall` — لا يُعاد العرض بعد الرفض.
+//   • ممنوع أي مؤقّت ضغط زائف.
 // ============================================================
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, CheckCircle } from 'phosphor-react-native';
-import { colors, radius, shadow, gradients } from '../../theme/theme';
+import React, { useCallback, useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { Check, Crown, X } from "phosphor-react-native";
+import { IconButton, OutlineButton, PressableScale, PrimaryButton, Skeleton } from "../../components/ui";
+import { colors, font, gradients, layout, radius, shadow, spacing } from "../../theme/theme";
+import {
+  durationLabel,
+  fetchPlans,
+  monthlyEquivalent,
+  planList,
+} from "../../services/subscriptionsApi";
+import { CURRENCY } from "../../services/walletApi";
+import { markPaywallDismissed } from "../../services/paywall";
+import { qaParams } from "../../services/qa";
 
-const FEATURES = [
-  'اختيار الفني الأعلى تقييماً',
-  'أولوية وصول في الطوارئ',
-  'نقاط مضاعفة وخدمة مجانية سنوياً',
-];
+const arNum = (value) => Number(value || 0).toLocaleString("ar-EG");
+const money = (value) => `${arNum(value)} ${CURRENCY}`;
 
-export default function PremiumPaywallScreen({ navigation }) {
+/**
+ * نصّ مربوط بالنيّة: العرض العام («اشترك للمزايا») أضعف بكثير من العرض
+ * المرتبط بما حاول المستخدم فعله قبل لحظة.
+ */
+const CONTEXTS = {
+  booking: {
+    title: "الحجز المسبق متاح لأعضاء الاشتراك",
+    message: "احجز موعد الصيانة في الوقت الذي يناسبك بدل انتظار توفّر فني.",
+    freeAlternative: "يمكنك طلب الخدمة فوراً بلا اشتراك.",
+  },
+  topRated: {
+    title: "اختيار الفني الأعلى تقييماً متاح للمشتركين",
+    message: "اختر الفني بنفسك بدل الإسناد التلقائي لأقرب متاح.",
+    freeAlternative: "الطلب الفوري يُسند لك أقرب فني متاح مجاناً.",
+  },
+  priority: {
+    title: "أولوية الطوارئ متاحة للمشتركين",
+    message: "طلبك يتقدّم في الصفّ عند الازدحام، ودعمك يُجاب أولاً.",
+    freeAlternative: "الطلب العادي يبقى متاحاً لك في أي وقت.",
+  },
+  default: {
+    title: "هذه الميزة متاحة للمشتركين",
+    message: "الاشتراك يفتح مزايا إضافية على طلباتك ودعمك.",
+    freeAlternative: "يمكنك متابعة استخدام التطبيق مجاناً بلا اشتراك.",
+  },
+};
+
+export default function PremiumPaywallScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  // qaParams تُرجع {} خارج التطوير — تسمح بفحص كل سياق عبر ?qa=premiumPaywall&feature=
+  const feature = route?.params?.feature || qaParams(["feature"]).feature || "default";
+  const context = CONTEXTS[feature] || CONTEXTS.default;
+
+  const [plan, setPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const plans = planList(await fetchPlans(true)).filter((item) => Number(item.price) > 0);
+      // أقلّ **مبلغ يُدفع فعلاً** لفتح الميزة — لا أقلّ تكلفة شهرية مكافئة:
+      // عرض سعر خطة سنوية في جدار اشتراك يضخّم الحاجز بلا داعٍ، والمقارنة
+      // الكاملة مكانها شاشة الخطط لا هنا.
+      const cheapest = plans.length
+        ? plans.reduce((a, b) => (Number(a.price) <= Number(b.price) ? a : b))
+        : null;
+      setPlan(cheapest);
+    } catch {
+      setPlan(null); // تعذّر جلب السعر لا يمنع الإغلاق ولا البديل المجاني
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // أي خروج يُسجَّل: لا يُعاد العرض لهذه الميزة قبل انتهاء فترة التهدئة
+  const dismiss = () => {
+    markPaywallDismissed(feature);
+    navigation?.goBack?.();
+  };
+
+  const features = (plan?.featuresAr || plan?.features || []).slice(0, 3);
 
   return (
-    <View style={s.root}>
-      {/* الخلفية المعتمة */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => navigation?.goBack?.()} />
+    <View style={styles.root}>
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="إغلاق"
+        onPress={dismiss}
+        feedback={false}
+        style={StyleSheet.absoluteFill}
+      />
 
-      {/* الورقة السفلية */}
-      <View style={[s.sheet, { paddingBottom: insets.bottom + 24 }]}>
-        <View style={s.grabber} />
-        <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.icon}>
-          <Crown size={40} weight="fill" color="#fff" />
-        </LinearGradient>
-        <Text style={s.title}>ميزة حصرية لأعضاء Premium</Text>
-        <Text style={s.sub}>طلب الفني الأعلى تقييماً متاح فقط في الخطة المدفوعة. اشترك الآن واستمتع بكل المزايا.</Text>
-
-        <View style={s.features}>
-          {FEATURES.map((f, i) => (
-            <View key={i} style={s.featRow}>
-              <CheckCircle size={17} weight="fill" color={colors.success} />
-              <Text style={s.featText}>{f}</Text>
-            </View>
-          ))}
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.xl }]}>
+        {/* زر الإغلاق أوّل عنصر وأوضحه: إخفاؤه أو تصغيره يولّد عداءً */}
+        <View style={styles.sheetHead}>
+          <IconButton label="إغلاق" onPress={dismiss} icon={<X size={20} color={colors.textHeading} />} />
+          <View style={styles.grabber} />
+          <View style={styles.headSpacer} />
         </View>
 
-        <Pressable onPress={() => navigation?.replace?.('Plans')} style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}>
-          <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.cta, shadow.button]}>
-            <Text style={s.ctaText}>الاشتراك بـ $5 / شهرياً</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+          <LinearGradient {...gradients.primaryDiag} style={styles.icon}>
+            <Crown size={34} weight="fill" color={colors.onPrimary} />
           </LinearGradient>
-        </Pressable>
-        <Text style={s.later} onPress={() => navigation?.goBack?.()}>ربما لاحقاً</Text>
+
+          <Text style={styles.title}>{context.title}</Text>
+          <Text style={styles.message}>{context.message}</Text>
+
+          {loading ? (
+            <View style={styles.priceSkeleton}><Skeleton width="60%" height={22} /></View>
+          ) : plan ? (
+            <View style={styles.priceBox}>
+              <Text style={styles.price}>{money(plan.price)}</Text>
+              <Text style={styles.priceSub}>
+                {durationLabel(plan)} · ≈ {money(monthlyEquivalent(plan))} شهرياً · يُخصم من محفظتك
+              </Text>
+            </View>
+          ) : null}
+
+          {features.length ? (
+            <View style={styles.features}>
+              {features.map((item) => (
+                <View key={item} style={styles.featureRow}>
+                  <Check size={15} weight="bold" color={colors.success} />
+                  <Text style={styles.featureText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <PrimaryButton
+            label={plan ? `اشترك بـ ${money(plan.price)}` : "عرض خطط الاشتراك"}
+            onPress={() => {
+              markPaywallDismissed(feature);
+              navigation?.replace?.("Plans");
+            }}
+            style={styles.cta}
+          />
+
+          {/* البديل المجاني صريح: الخروج بلا اشتراك ليس طريقاً مسدوداً */}
+          <Text style={styles.alternative}>{context.freeAlternative}</Text>
+          <OutlineButton label="المتابعة بدون اشتراك" onPress={dismiss} />
+        </ScrollView>
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#2a1b3d66', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 24, paddingTop: 14 },
-  grabber: { width: 44, height: 5, borderRadius: 999, backgroundColor: '#e2d7ef', alignSelf: 'center', marginBottom: 18 },
-  icon: { width: 78, height: 78, borderRadius: 24, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', ...shadow.button },
-  title: { marginTop: 18, fontSize: 21, fontWeight: '700', color: colors.textDark, textAlign: 'center' },
-  sub: { marginTop: 10, fontSize: 13.5, color: colors.textBody, lineHeight: 24, textAlign: 'center' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" },
+  sheet: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    maxHeight: "92%",
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    ...shadow.card,
+  },
+  sheetHead: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between" },
+  grabber: { width: 44, height: 5, borderRadius: radius.pill, backgroundColor: colors.borderInput },
+  headSpacer: { width: layout.touchTarget, height: layout.touchTarget },
+  sheetContent: { paddingTop: spacing.sm, gap: spacing.md },
 
-  features: { backgroundColor: '#faf8fd', borderWidth: 1, borderColor: colors.border, borderRadius: 18, padding: 16, marginTop: 18, gap: 11 },
-  featRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9 },
-  featText: { flex: 1, fontSize: 13, color: '#4a4358', textAlign: 'right' },
+  icon: {
+    width: 68,
+    height: 68,
+    borderRadius: radius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+  },
+  title: { fontSize: font.size.title, fontWeight: "700", color: colors.textDark, textAlign: "center" },
+  message: { fontSize: font.size.sm, color: colors.textBody, textAlign: "center", lineHeight: 23 },
 
-  cta: { height: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center', marginTop: 18 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  later: { textAlign: 'center', fontSize: 14, color: colors.textMuted, fontWeight: '600', marginTop: 14 },
+  priceSkeleton: { alignItems: "center" },
+  priceBox: { alignItems: "center", gap: 2 },
+  price: { fontSize: font.size.h1, fontWeight: "700", color: colors.primary },
+  priceSub: { fontSize: font.size.xs, color: colors.textMuted, textAlign: "center" },
+
+  features: {
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.card,
+    padding: spacing.md,
+  },
+  featureRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  featureText: { flex: 1, fontSize: font.size.sm, color: colors.textBody, textAlign: "right", lineHeight: 21 },
+
+  cta: { marginTop: spacing.xs },
+  alternative: { fontSize: font.size.xs, color: colors.textMuted, textAlign: "center" },
 });

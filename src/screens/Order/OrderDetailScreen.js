@@ -1,182 +1,536 @@
 // ============================================================
-//  OrderDetailScreen — ٢٤ · تفاصيل الطلب ومساره  (القسم G)
+//  OrderDetailScreen — ٢٦ · تفاصيل الطلب
+//
+//  الشاشة مرجع كامل وسجلّ نزاع: ماذا طلبت، ممن، بكم، ومتى تغيّر كل شيء.
+//  لذلك قاعدتها الأولى: **صفر قيم خام**. كانت طريقة الدفع وحالته تظهران
+//  «cash · pending»، والشارة العليا خضراء دائماً فيبدو الطلب الملغى ناجحاً،
+//  والمبالغ بأرقام لاتينية — ثلاثة أخطاء تقع في الموضع الذي يُحتكَم إليه.
 // ============================================================
 
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  ArrowRight, CarBattery, Star, CaretLeft, Check, Wallet,
-  CheckCircle, ArrowClockwise, DownloadSimple, WarningCircle,
-} from 'phosphor-react-native';
-import { colors, radius, shadow, gradients } from '../../theme/theme';
+  ArrowClockwise,
+  CalendarCheck,
+  CaretLeft,
+  ChatCircle,
+  Check,
+  MapPin,
+  NavigationArrow,
+  Car,
+  Wallet,
+  WarningCircle,
+  Wrench,
+  X,
+} from "phosphor-react-native";
+import {
+  AppHeader,
+  AsyncContent,
+  ConfirmSheet,
+  ErrorBanner,
+  OutlineButton,
+  PressableScale,
+  PrimaryButton,
+  SkeletonCard,
+  StatusPill,
+  TONE_PALETTE,
+} from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { cancelOrder, fetchOrder, fetchOrderStatusHistory } from "../../services/ordersApi";
+import { fetchProvider, providerInitials, providerRole } from "../../services/providersApi";
+import { fetchVehicle, vehicleSub, vehicleTitle } from "../../services/vehiclesApi";
+import { reverseGeocode } from "../../services/geocoding";
+import {
+  canCancel,
+  cancelReasonLabel,
+  canConfirmCompletion as canConfirm,
+  canReview,
+  isActive,
+  paymentMethodLabel,
+  paymentStatusMeta,
+  statusMeta,
+} from "../../services/orderStatus";
+import { formatFullDate, formatTime } from "../../services/scheduling";
 
-const TIMELINE = [
-  { title: 'تم إنشاء الطلب', time: '١٤:٣٠' },
-  { title: 'قبل الفني الطلب', time: '١٤:٣٢ · أحمد خليل' },
-  { title: 'وصل الفني وبدأ العمل', time: '١٤:٤١' },
-  { title: 'اكتملت الخدمة', time: '١٥:٠٢', last: true },
-];
+const arNum = (value) => Number(value || 0).toLocaleString("ar-EG");
+const money = (value) => `${arNum(value)} ل.س`;
+
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ar-EG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
 
 export default function OrderDetailScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const ref = route?.params?.ref || '#CH-24815';
+  const orderId = route?.params?.orderId || route?.params?.order?.id || route?.params?.order?._id;
+
+  const [order, setOrder] = useState(route?.params?.order || null);
+  const [history, setHistory] = useState([]);
+  const [provider, setProvider] = useState(null);
+  const [vehicle, setVehicle] = useState(null);
+  const [address, setAddress] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [forbidden, setForbidden] = useState(false);
+
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState("");
+
+  const load = useCallback(async () => {
+    if (!orderId) {
+      setError("رقم الطلب غير متوفّر");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setForbidden(false);
+    try {
+      const [details, statuses] = await Promise.all([
+        fetchOrder(orderId),
+        fetchOrderStatusHistory(orderId).catch(() => []),
+      ]);
+      setOrder(details);
+      setHistory(Array.isArray(statuses) ? statuses : statuses?.data || []);
+
+      // بيانات مرافقة: فشل أيّها لا يجوز أن يُسقط الشاشة كلها — التفاصيل
+      // المالية والزمنية وصلت أصلاً، وهي جوهر الشاشة.
+      if (details?.providerId) {
+        fetchProvider(details.providerId).then(setProvider).catch(() => setProvider(null));
+      } else {
+        setProvider(null);
+      }
+      if (details?.vehicleId) {
+        fetchVehicle(details.vehicleId).then(setVehicle).catch(() => setVehicle(null));
+      } else {
+        setVehicle(null);
+      }
+      const [longitude, latitude] = details?.userLocation?.coordinates || [];
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+        reverseGeocode(latitude, longitude).then(setAddress).catch(() => setAddress(""));
+      }
+    } catch (loadError) {
+      // «لا صلاحية» ليست عطلاً: إعادة المحاولة لن تُجدي، والمخرج الصحيح
+      // هو العودة إلى القائمة لا زرّ يعيد الفشل نفسه.
+      const denied = loadError?.statusCode === 403 || loadError?.statusCode === 404;
+      setForbidden(denied);
+      setError(loadError?.message || "تعذّر جلب تفاصيل الطلب");
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const doCancel = async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    setActionError("");
+    try {
+      const updated = await cancelOrder(orderId, "Cancelled by customer");
+      setOrder(updated || { ...order, status: "cancelled" });
+      setConfirmingCancel(false);
+      load();
+    } catch (cancelError) {
+      setConfirmingCancel(false);
+      setActionError(cancelError?.message || "تعذّر إلغاء الطلب، حاول مجدداً");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const status = statusMeta(order?.status);
+  const payment = paymentStatusMeta(order?.paymentStatus);
+  const amount = order?.payableAmount ?? order?.totalAmount ?? order?.total ?? 0;
+  const scheduledAt = order?.isScheduled && order?.scheduledAt ? new Date(order.scheduledAt) : null;
+
+  const reorder = () => navigation?.navigate?.("ConfirmOrder", {
+    serviceId: order?.serviceId,
+    serviceName: order?.serviceName || order?.metadata?.serviceName,
+    servicePrice: order?.servicePrice,
+    providerId: order?.providerId,
+  });
 
   return (
-    <View style={s.root}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 30 }}>
-        {/* الترويسة */}
-        <View style={s.head}>
-          <Pressable style={s.back} onPress={() => navigation?.goBack?.()}><ArrowRight size={20} color={colors.textHeading} /></Pressable>
-          <View>
-            <Text style={s.headTitle}>تفاصيل الطلب</Text>
-            <Text style={s.headRef}>{ref}</Text>
-          </View>
-        </View>
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.xxl },
+        ]}
+      >
+        <AppHeader
+          title="تفاصيل الطلب"
+          subtitle={order?.orderNumber || ""}
+          onBack={() => navigation?.goBack?.()}
+        />
 
-        {/* بطاقة الخدمة */}
-        <View style={[s.card, { flexDirection: 'row-reverse', alignItems: 'center', gap: 12 }]}>
-          <View style={s.svcIcon}><CarBattery size={24} weight="fill" color={colors.primary} /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.svcTitle}>شحن بطارية</Text>
-            <Text style={s.svcSub}>هوا سيراتو ٢٠٢٠ · دمشق، المزة</Text>
+        {forbidden ? (
+          <View style={styles.denied}>
+            <View style={styles.deniedIcon}><WarningCircle size={26} weight="fill" color={colors.danger} /></View>
+            <Text style={styles.deniedTitle}>لا يمكن عرض هذا الطلب</Text>
+            <Text style={styles.deniedText}>{error}</Text>
+            <PrimaryButton label="العودة إلى طلباتي" onPress={() => navigation?.navigate?.("Orders")} />
           </View>
-          <View style={s.doneBadge}><Text style={s.doneBadgeText}>مكتمل</Text></View>
-        </View>
+        ) : (
+          <AsyncContent
+            loading={loading}
+            error={error}
+            hasData={!!order}
+            onRetry={load}
+            errorTitle="تعذّر تحميل الطلب"
+            skeleton={<View style={styles.skeleton}><SkeletonCard lines={2} /><SkeletonCard lines={4} /><SkeletonCard lines={3} /></View>}
+          >
+            {order ? (
+              <>
+                <View style={styles.card}>
+                  <View style={styles.rowHead}>
+                    <View style={styles.icon}><Wrench size={22} weight="fill" color={colors.primary} /></View>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>{order.serviceName || order?.metadata?.serviceName || "خدمة سيارة"}</Text>
+                      <Text style={styles.cardSub}>{formatDateTime(order.createdAt)}</Text>
+                    </View>
+                    {/* الشارة تتبع نغمة الحالة: كانت خضراء دائماً فيبدو الملغى ناجحاً */}
+                    <StatusPill label={status.label} tone={status.tone} />
+                  </View>
 
-        {/* بطاقة الفني */}
-        <Pressable
-          style={({ pressed }) => [s.card, s.provCard, pressed && { transform: [{ scale: 0.98 }] }]}
-          onPress={() => Alert.alert('ملف الفني', 'الملف الكامل للفني سيتوفّر قريباً.')}
-        >
-          <View style={s.provAvatar}><Text style={s.provInitials}>أ خ</Text></View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.provName}>أحمد خليل</Text>
-            <View style={s.ratingRow}>
-              <Star size={12} weight="fill" color={colors.star} />
-              <Text style={s.ratingText}>4.9 · فني بطاريات وكهرباء</Text>
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6 }}>
-            <Text style={s.provLink}>عرض الفني</Text>
-            <CaretLeft size={15} color="#b7a8ca" />
-          </View>
-        </Pressable>
+                  {scheduledAt ? (
+                    <View style={styles.scheduled}>
+                      <CalendarCheck size={17} weight="fill" color={colors.primary} />
+                      <Text style={styles.scheduledText}>
+                        حجز مسبق · {formatFullDate(scheduledAt)} الساعة {formatTime(scheduledAt)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
 
-        {/* مسار الطلب */}
-        <Text style={s.sectionTitle}>مسار الطلب</Text>
-        <View style={s.card}>
-          {TIMELINE.map((step, i) => (
-            <View key={i} style={{ flexDirection: 'row-reverse', gap: 12, marginBottom: step.last ? 0 : 14 }}>
-              <View style={{ alignItems: 'center' }}>
-                <View style={s.tlDot}><Check size={12} weight="bold" color="#fff" /></View>
-                {!step.last && <View style={s.tlLine} />}
-              </View>
-              <View style={{ paddingBottom: step.last ? 0 : 6 }}>
-                <Text style={s.tlTitle}>{step.title}</Text>
-                <Text style={s.tlTime}>{step.time}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+                {order.providerId ? (
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`عرض ملف ${provider?.businessName || "الفني المعيّن"}`}
+                    style={[styles.card, styles.providerCard]}
+                    onPress={() => navigation?.navigate?.("ProviderProfile", { providerId: order.providerId })}
+                  >
+                    <View style={styles.avatar}><Text style={styles.initials}>{providerInitials(provider) || "ف"}</Text></View>
+                    <View style={styles.copy}>
+                      <Text style={styles.cardTitle}>{provider?.businessName || "الفني المعيّن"}</Text>
+                      <Text style={styles.cardSub} numberOfLines={1}>
+                        {provider ? (providerRole(provider) || "فني معتمد") : "جارٍ تحميل بيانات الفني…"}
+                      </Text>
+                    </View>
+                    <CaretLeft size={16} color={colors.textMuted2} />
+                  </PressableScale>
+                ) : null}
 
-        {/* السعر */}
-        <View style={s.card}>
-          <Row label="سعر الخدمة" val="٤٠٠٠٠ ل.س" />
-          <Row label="رسوم الوصول" val="١٠٠٠٠ ل.س" />
-          <Row label="خصم نقاط الوفاء" val="− ٥٠٠ ل.س" green />
-          <View style={s.priceDivider} />
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>المدفوع</Text>
-            <Text style={s.totalVal}>٤٩٥٠٠ ل.س</Text>
-          </View>
-          <View style={s.payRow}>
-            <View style={s.payIcon}><Wallet size={17} weight="fill" color={colors.primary} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.payLabel}>طريقة الدفع</Text>
-              <Text style={s.payVal}>محفظة Car Hero</Text>
-            </View>
-            <CheckCircle size={18} weight="fill" color={colors.success} />
-          </View>
-        </View>
+                {/* المركبة والموقع كما كانا وقت الطلب — لا الحاليّين */}
+                {vehicle || address ? (
+                  <View style={styles.card}>
+                    {vehicle ? (
+                      <View style={styles.rowHead}>
+                        <View style={styles.iconSmall}><Car size={18} weight="fill" color={colors.primary} /></View>
+                        <View style={styles.copy}>
+                          <Text style={styles.metaLabel}>المركبة</Text>
+                          <Text style={styles.metaValue}>{vehicleTitle(vehicle)}{vehicleSub(vehicle) ? ` · ${vehicleSub(vehicle)}` : ""}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                    {vehicle && address ? <View style={styles.divider} /> : null}
+                    {address ? (
+                      <View style={styles.rowHead}>
+                        <View style={styles.iconSmall}><MapPin size={18} weight="fill" color={colors.primary} /></View>
+                        <View style={styles.copy}>
+                          <Text style={styles.metaLabel}>موقع الخدمة</Text>
+                          <Text style={styles.metaValue} numberOfLines={2}>{address}</Text>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
 
-        {/* الأزرار */}
-        <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 16 }}>
-          <Pressable onPress={() => navigation?.navigate?.('Services')} style={({ pressed }) => [{ flex: 1 }, pressed && { transform: [{ scale: 0.97 }] }]}>
-            <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.reorder, shadow.button]}>
-              <ArrowClockwise size={17} weight="fill" color="#fff" />
-              <Text style={s.reorderText}>اطلب مرة أخرى</Text>
-            </LinearGradient>
-          </Pressable>
-          <Pressable style={({ pressed }) => [s.iconBtn, pressed && { transform: [{ scale: 0.95 }] }]}>
-            <DownloadSimple size={19} color={colors.primary} />
-          </Pressable>
-        </View>
-        <Pressable
-          onPress={() => Alert.alert('الإبلاغ عن مشكلة', 'تم استلام بلاغك، وسيتواصل معك فريق الدعم قريباً.')}
-          style={({ pressed }) => [s.report, pressed && { transform: [{ scale: 0.98 }] }]}
-        >
-          <WarningCircle size={17} color={colors.danger} />
-          <Text style={s.reportText}>الإبلاغ عن مشكلة</Text>
-        </Pressable>
+                <Text style={styles.sectionTitle}>مسار الطلب</Text>
+                <View style={styles.card}>
+                  <Timeline history={history} order={order} />
+                </View>
+
+                <Text style={styles.sectionTitle}>التفصيل المالي</Text>
+                <View style={styles.card}>
+                  <PriceRow label="سعر الخدمة" value={money(order.servicePrice ?? order.total ?? amount)} />
+                  {order.discountAmount ? <PriceRow label="الخصم" value={`- ${money(order.discountAmount)}`} tone="success" /> : null}
+                  <View style={styles.divider} />
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>الإجمالي</Text>
+                    <Text style={styles.totalValue}>{money(amount)}</Text>
+                  </View>
+
+                  <View style={styles.payRow}>
+                    <View style={styles.iconSmall}><Wallet size={17} weight="fill" color={colors.primary} /></View>
+                    <View style={styles.copy}>
+                      <Text style={styles.metaLabel}>طريقة الدفع</Text>
+                      {/* كانت تُعرض «cash · pending» خاماً في أهمّ سطر بالشاشة */}
+                      <Text style={styles.metaValue}>{paymentMethodLabel(order.paymentMethod)}</Text>
+                    </View>
+                    <StatusPill label={payment.label} tone={payment.tone} />
+                  </View>
+                </View>
+
+                {actionError ? <ErrorBanner message={actionError} style={styles.banner} /> : null}
+
+                {/* الإجراءات مشتقّة من دوال orderStatus وحدها — لا شروط محلّية
+                    تتباعد عنها مع أول تعديل في قواعد الحالات. */}
+                <View style={styles.actions}>
+                  {isActive(order.status) ? (
+                    <View style={styles.actionRow}>
+                      <PrimaryButton
+                        label="تتبّع الطلب"
+                        icon={<NavigationArrow size={17} weight="fill" color={colors.onPrimary} />}
+                        onPress={() => navigation?.navigate?.("Tracking", { orderId })}
+                        style={styles.grow}
+                      />
+                      {order.providerId ? (
+                        <PressableScale
+                          accessibilityRole="button"
+                          accessibilityLabel="محادثة الفني"
+                          onPress={() => navigation?.navigate?.("Chat", { orderId, providerId: order.providerId })}
+                          style={styles.chatButton}
+                        >
+                          <ChatCircle size={20} color={colors.primary} />
+                        </PressableScale>
+                      ) : null}
+                    </View>
+                  ) : null}
+
+                  {canConfirm(order.status) ? (
+                    <OutlineButton
+                      label="تأكيد إتمام الخدمة"
+                      onPress={() => navigation?.navigate?.("ConfirmCompletion", { orderId, order })}
+                    />
+                  ) : null}
+
+                  {canReview(order.status) ? (
+                    <OutlineButton
+                      label="تقييم الخدمة"
+                      onPress={() => navigation?.navigate?.("Review", { orderId, order })}
+                    />
+                  ) : null}
+
+                  {/* أعلى قيمة للمستخدم المتكرّر: كانت تنقله إلى قائمة الخدمات
+                      فارغة اليدين، فيعيد اختيار كل شيء من الصفر. */}
+                  <OutlineButton
+                    label="اطلب هذه الخدمة مجدداً"
+                    icon={<ArrowClockwise size={17} color={colors.primary} />}
+                    onPress={reorder}
+                  />
+
+                  {canCancel(order.status) ? (
+                    <OutlineButton
+                      danger
+                      label="إلغاء الطلب"
+                      icon={<X size={16} color={colors.danger} />}
+                      onPress={() => { setActionError(""); setConfirmingCancel(true); }}
+                    />
+                  ) : null}
+                </View>
+              </>
+            ) : null}
+          </AsyncContent>
+        )}
       </ScrollView>
+
+      {/* التأكيد بـ ConfirmSheet حصراً: Alert.alert لا تُستدعى دوالّ أزراره
+          على الويب، فكان زر «إلغاء الطلب» بلا أي أثر. */}
+      <ConfirmSheet
+        visible={confirmingCancel}
+        title="إلغاء هذا الطلب؟"
+        message="لا يمكن التراجع عن الإلغاء بعد تنفيذه. إن كنت دفعت مسبقاً يُعاد المبلغ إلى محفظتك."
+        confirmLabel="نعم، ألغِ الطلب"
+        cancelLabel="تراجع"
+        danger
+        busy={cancelling}
+        onConfirm={doCancel}
+        onCancel={() => setConfirmingCancel(false)}
+      />
     </View>
   );
 }
 
-function Row({ label, val, green }) {
+/**
+ * المسار الزمني الكامل — هذا ما يحسم النزاعات.
+ * كل نقطة كانت خضراء بعلامة صح مهما كانت الحالة، فيبدو الرفض إنجازاً.
+ */
+function Timeline({ history, order }) {
+  const steps = history.length ? history : [{ status: order.status, createdAt: order.createdAt }];
   return (
-    <View style={s.priceRow}>
-      <Text style={[s.priceLabel, green && { color: colors.success }]}>{label}</Text>
-      <Text style={[s.priceVal, green && { color: colors.success }]}>{val}</Text>
+    <>
+      {steps.map((step, index) => {
+        const value = step.status || step.toStatus;
+        const meta = statusMeta(value);
+        const [, foreground] = TONE_PALETTE[meta.tone] || TONE_PALETTE.neutral;
+        const failed = meta.tone === "danger";
+        const last = index === steps.length - 1;
+        return (
+          <View key={step.id || step._id || index} style={styles.step}>
+            <View style={styles.stepRail}>
+              <View style={[styles.stepDot, { backgroundColor: foreground }]}>
+                {failed
+                  ? <X size={11} weight="bold" color={colors.onPrimary} />
+                  : <Check size={11} weight="bold" color={colors.onPrimary} />}
+              </View>
+              {!last ? <View style={styles.stepLine} /> : null}
+            </View>
+            <View style={styles.stepCopy}>
+              <Text style={styles.stepTitle}>{meta.label}</Text>
+              <Text style={styles.stepTime}>{formatDateTime(step.createdAt || step.changedAt || step.timestamp)}</Text>
+              {step.reason && failed ? <Text style={styles.stepReason}>{cancelReasonLabel(step.reason)}</Text> : null}
+            </View>
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
+function PriceRow({ label, value, tone }) {
+  const color = tone === "success" ? colors.success : undefined;
+  return (
+    <View style={styles.priceRow}>
+      <Text style={[styles.priceLabel, color && { color }]}>{label}</Text>
+      <Text style={[styles.priceValue, color && { color }]}>{value}</Text>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#f6f3fa' },
-  head: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, marginBottom: 20 },
-  back: { width: 44, height: 44, borderRadius: 13, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow.soft, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14 },
-  headTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  headRef: { fontSize: 12, color: colors.textMuted, writingDirection: 'ltr', textAlign: 'right' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: {
+    width: "100%",
+    maxWidth: layout.contentMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.screenH,
+  },
+  skeleton: { gap: spacing.md, marginTop: spacing.lg },
 
-  card: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, borderRadius: 18, padding: 16, marginBottom: 14, ...shadow.soft, shadowOpacity: 0.10 },
-  svcIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  svcTitle: { fontSize: 15, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  svcSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, textAlign: 'right' },
-  doneBadge: { backgroundColor: colors.successBg, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 10 },
-  doneBadgeText: { fontSize: 11, fontWeight: '700', color: colors.success },
+  card: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderCard,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  rowHead: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
+  icon: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    borderRadius: radius.sm,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconSmall: {
+    width: 34,
+    height: 34,
+    flexShrink: 0,
+    borderRadius: radius.xs,
+    backgroundColor: colors.tint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  copy: { flex: 1, minWidth: 0 },
+  cardTitle: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  cardSub: { marginTop: 2, fontSize: font.size.xs, color: colors.textMuted, textAlign: "right" },
+  metaLabel: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
+  metaValue: { marginTop: 1, fontSize: font.size.sm, fontWeight: "700", color: colors.textDark, textAlign: "right" },
 
-  provCard: { flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 13 },
-  provAvatar: { width: 46, height: 46, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
-  provInitials: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  provName: { fontSize: 14.5, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  ratingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 5, marginTop: 3 },
-  ratingText: { fontSize: 12, color: colors.textMuted },
-  provLink: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  scheduled: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+  scheduledText: { flex: 1, fontSize: font.size.xs, color: colors.textBody, textAlign: "right" },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, marginBottom: 12, textAlign: 'right' },
-  tlDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center' },
-  tlLine: { width: 2, flex: 1, backgroundColor: colors.success, marginTop: 2 },
-  tlTitle: { fontSize: 13.5, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  tlTime: { fontSize: 11.5, color: colors.textMuted, marginTop: 1, textAlign: 'right' },
+  providerCard: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
+  avatar: {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  initials: { fontSize: font.size.md, fontWeight: "700", color: colors.onPrimary },
 
-  priceRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginBottom: 9 },
-  priceLabel: { fontSize: 13.5, color: colors.textBody },
-  priceVal: { fontSize: 13.5, fontWeight: '600', color: colors.textDark },
-  priceDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
-  totalRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', marginTop: 5 },
-  totalLabel: { fontSize: 15, fontWeight: '700', color: colors.textDark },
-  totalVal: { fontSize: 15, fontWeight: '700', color: colors.primary },
-  payRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 9, marginTop: 13, paddingTop: 13, borderTopWidth: 1, borderTopColor: colors.border },
-  payIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  payLabel: { fontSize: 11.5, color: colors.textMuted, textAlign: 'right' },
-  payVal: { fontSize: 13.5, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
+  sectionTitle: {
+    marginTop: spacing.xl,
+    marginBottom: -spacing.xs,
+    fontSize: font.size.md,
+    fontWeight: "700",
+    color: colors.textDark,
+    textAlign: "right",
+  },
 
-  reorder: { height: 50, borderRadius: 15, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  reorderText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  iconBtn: { width: 50, height: 50, borderRadius: 15, borderWidth: 1, borderColor: colors.borderRow, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  report: { height: 46, borderRadius: 14, backgroundColor: colors.dangerBg, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 10 },
-  reportText: { color: colors.danger, fontSize: 13.5, fontWeight: '700' },
+  step: { flexDirection: "row-reverse", gap: spacing.md },
+  stepRail: { alignItems: "center" },
+  stepDot: { width: 22, height: 22, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
+  stepLine: { width: 2, flex: 1, minHeight: 18, backgroundColor: colors.border, marginVertical: 2 },
+  stepCopy: { flex: 1, paddingBottom: spacing.md },
+  stepTitle: { fontSize: font.size.sm, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  stepTime: { marginTop: 1, fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
+  stepReason: { marginTop: 2, fontSize: font.size.xs, color: colors.textBody, textAlign: "right" },
+
+  priceRow: { flexDirection: "row-reverse", justifyContent: "space-between", gap: spacing.md, paddingVertical: 5 },
+  priceLabel: { fontSize: font.size.sm, color: colors.textBody },
+  priceValue: { fontSize: font.size.sm, fontWeight: "600", color: colors.textDark },
+  divider: { height: 1, backgroundColor: colors.borderSoft, marginVertical: spacing.sm },
+  totalRow: { flexDirection: "row-reverse", justifyContent: "space-between", gap: spacing.md },
+  totalLabel: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark },
+  totalValue: { fontSize: font.size.body, fontWeight: "700", color: colors.primary },
+  payRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+  },
+
+  banner: { marginTop: spacing.md },
+  actions: { marginTop: spacing.lg, gap: spacing.sm },
+  actionRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  grow: { flex: 1, width: "auto" },
+  chatButton: {
+    width: layout.buttonHeight,
+    height: layout.buttonHeight,
+    flexShrink: 0,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderInput,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  denied: { marginTop: spacing.xxl, alignItems: "center", gap: spacing.md },
+  deniedIcon: {
+    width: 54,
+    height: 54,
+    borderRadius: radius.pill,
+    backgroundColor: colors.dangerBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deniedTitle: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "center" },
+  deniedText: { fontSize: font.size.sm, color: colors.textBody, textAlign: "center", lineHeight: 22 },
 });

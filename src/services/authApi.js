@@ -17,14 +17,23 @@ export function toE164Syrian(digits) {
 }
 
 // POST /auth/register → { message, phoneNumber, expiresIn }
-export async function register({ fullName, phone, password, accountType }) {
-  return api.post('/auth/register', {
+//   في وضع تخطّي OTP (تطوير) يرجع الباك جلسة { user, accessToken, refreshToken }
+//   بدل رد الـ OTP — عندها نحفظ الجلسة مباشرةً (دخول تلقائي).
+export async function register({ fullName, phone, password, accountType, isTermsAccepted }) {
+  const res = await api.post('/auth/register', {
     fullName,
     phoneNumber: toE164Syrian(phone),
     password,
     accountType: accountType || 'customer',
-    isTermsAccepted: true,
+    // موافقة المستخدم الفعلية لا قيمة ثابتة: تثبيتها على true كان يُسجّل في
+    // الخادم موافقةً قد لا يكون المستخدم منحها، وهو ما تمنعه القاعدة نفسها
+    // التي تمنع الاختيار المسبق للمربّع.
+    isTermsAccepted: isTermsAccepted === true,
   });
+  if (res?.accessToken && res?.user) {
+    await saveSession(res);
+  }
+  return res;
 }
 
 // POST /auth/verify-otp → { user, accessToken, refreshToken } — يسجّل الدخول تلقائياً
@@ -52,16 +61,18 @@ export async function login({ phone, password }) {
   return session;
 }
 
-// POST /auth/forgot-password → { message, phoneNumber, expiresIn }
+// POST /auth/forgot-password → { message, phoneNumber, expiresIn, otpBypassed? }
+//   otpBypassed يصل من الخادم فقط أثناء تعليق OTP في التطوير (راجع dev-flags).
 export async function forgotPassword({ phone }) {
   return api.post('/auth/forgot-password', { phoneNumber: toE164Syrian(phone) });
 }
 
 // POST /auth/reset-password → { message }  (يتحقّق من الرمز ويعيّن الكلمة معاً)
+//   يُرسل otpCode فقط عند وجوده؛ أثناء تعليق OTP لا يوجد رمز والخادم لا يطلبه.
 export async function resetPassword({ phone, code, newPassword }) {
   return api.post('/auth/reset-password', {
     phoneNumber: toE164Syrian(phone),
-    otpCode: code,
+    ...(code ? { otpCode: code } : {}),
     newPassword,
   });
 }

@@ -1,137 +1,174 @@
-// ============================================================
-//  Car Hero — Design Tokens
-//  نظام التصميم الموحّد لكل الشاشات الجديدة
-//  الاستخدام:  import { colors, radius, spacing, font, shadow, gradients } from '../../theme/theme';
-// ============================================================
-
-/* ---------- الألوان ---------- */
+// Car Hero design tokens. Keep visual decisions here so every flow feels related.
 export const colors = {
-  // العلامة
-  primary: "#6a1b9a", // البنفسجي الأساسي
-  primaryLight: "#8f5cb1", // بنفسجي فاتح (بداية التدرّج)
-  primarySoft: "#c9a7e3", // لمسات / توهج
+  primary: "#5B2A7D",
+  primaryPressed: "#45205F",
+  primaryLight: "#77439A",
+  primarySoft: "#E9DFF0",
+  tint: "#F3EDF7",
+  tint2: "#E9DFF0",
+  tint3: "#D7C3E3",
 
-  // خلفيات ناعمة
-  tint: "#f3ebfb", // خلفية الشارات والأيقونات المتحركة
-  tint2: "#e4d2f4",
-  tint3: "#d6bced",
-  surface: "#ffffff", // البطاقات والأسطح
-  screenBg: "#faf7fd", // خلفية الشاشة العامة
+  secondary: "#0B7F7A",
+  secondaryPressed: "#08635F",
+  secondarySoft: "#E2F3F1",
+  accent: "#E5A12E",
+  accentSoft: "#FFF4DE",
 
-  // النصوص
-  textDark: "#2a1b3d", // العناوين الأساسية
-  textHeading: "#3a2450", // عناوين ثانوية
-  textBody: "#6b6577", // النص العادي
-  textMuted: "#8a8397", // نص خافت / تسميات
-  textMuted2: "#9a93a6", // خافت جداً (تخطي)
+  surface: "#FFFFFF",
+  surfaceRaised: "#FFFFFF",
+  surfaceAlt: "#F0F2F5",
+  screenBg: "#F6F7F9",
+  overlay: "#17151D99",
 
-  // الحدود
-  border: "#f0eaf7",
-  borderCard: "#efe9f6",
-  borderSoft: "#e6dff0",
-  borderInput: "#e2d7ef",
-  borderRow: "#e6dcf0",
+  textDark: "#191A20",
+  textHeading: "#282A33",
+  textBody: "#555B66",
+  textMuted: "#777E89",
+  textMuted2: "#9298A2",
+  onPrimary: "#FFFFFF",
 
-  // نقاط المؤشر
-  dotInactive: "#d9cfe6",
+  border: "#E6E8EC",
+  borderCard: "#E1E4E9",
+  borderSoft: "#ECEEF1",
+  borderInput: "#D9DDE3",
+  borderRow: "#E8EAEE",
+  dotInactive: "#CDD1D7",
 
-  // الحالات
-  success: "#2e9e6b",
-  successBg: "#e7f6ee",
-  warning: "#e8912e",
-  star: "#e8912e",
-  danger: "#d84a5a",
-  dangerBg: "#fdeef0",
+  success: "#16845B",
+  successBg: "#E5F5EE",
+  warning: "#C47A12",
+  warningBg: "#FFF3DB",
+  star: "#D8921F",
+  danger: "#C63D4F",
+  dangerBg: "#FCECEF",
+  info: "#2877B7",
+  infoBg: "#EAF3FA",
 };
 
-/* ---------- التدرّجات (مع expo-linear-gradient) ---------- */
 export const gradients = {
-  primary: ["#8f5cb1", "#6a1b9a"],
+  primary: ["#73409A", "#51216F"],
   primaryDiag: {
-    colors: ["#8f5cb1", "#6a1b9a"],
+    colors: ["#73409A", "#51216F"],
     start: { x: 0, y: 0 },
     end: { x: 1, y: 1 },
   },
-  illustration: ["#f3ebfb", "#e4d2f4", "#d6bced"],
-  illustrationSoft: ["#f6f0fc", "#ece0f7"],
-  logoTile: ["#f3ebfb", "#e4d2f4"],
+  illustration: ["#F4EFF7", "#E7F2F1", "#ECE7F1"],
+  illustrationSoft: ["#F7F5F8", "#EDF5F4"],
+  logoTile: ["#F3EDF7", "#E6F2F1"],
 };
 
-/* ---------- الزوايا ---------- */
 export const radius = {
   pill: 999,
-  phone: 46,
-  xl: 32,
-  lg: 18,
-  card: 18,
-  md: 16,
-  sm: 15,
-  xs: 13,
-  tile: 10,
+  phone: 24,
+  xl: 16,
+  lg: 12,
+  card: 8,
+  md: 10,
+  sm: 8,
+  xs: 6,
+  tile: 8,
 };
 
-/* ---------- المسافات ---------- */
 export const spacing = {
   xs: 4,
   sm: 8,
   md: 12,
   lg: 16,
-  xl: 22,
-  xxl: 26,
-  screenH: 26,
-  screenTop: 52,
+  xl: 20,
+  xxl: 24,
+  screenH: 20,
+  screenTop: 16,
 };
 
-/* ---------- الخطوط والأحجام ---------- */
 export const font = {
-  family: "Cairo",
-  familyBold: "Cairo-Bold",
+  family: "Cairo_400Regular",
+  familyMedium: "Cairo_500Medium",
+  familySemiBold: "Cairo_600SemiBold",
+  familyBold: "Cairo_700Bold",
   size: {
-    h1: 25,
+    h1: 26,
     title: 20,
-    button: 16.5,
-    body: 15.5,
-    md: 15,
-    sm: 14,
-    smBtn: 13.5,
-    label: 13,
-    xs: 12,
-    xxs: 11.5,
+    button: 15,
+    body: 15,
+    md: 14,
+    sm: 13,
+    smBtn: 13,
+    label: 12,
+    xs: 11,
+    xxs: 10,
   },
   weight: {
     regular: "400",
-    medium: "600",
+    medium: "500",
+    semibold: "600",
     bold: "700",
   },
   lineHeight: {
-    heading: 1.35,
-    body: 1.75,
+    heading: 36,
+    body: 25,
   },
 };
 
-/* ---------- الظلال (iOS + Android) ---------- */
+const baseShadow = {
+  shadowColor: "#17151D",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 10,
+  elevation: 3,
+};
+
 export const shadow = {
-  card: {
-    shadowColor: "#6a1b9a",
-    shadowOffset: { width: 0, height: 30 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 12,
-  },
+  card: baseShadow,
   button: {
-    shadowColor: "#6a1b9a",
-    shadowOffset: { width: 0, height: 14 },
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  soft: {
-    shadowColor: "#6a1b9a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
+    shadowColor: "#45205F",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
     elevation: 4,
   },
+  soft: {
+    shadowColor: "#17151D",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 7,
+    elevation: 2,
+  },
 };
 
-export default { colors, gradients, radius, spacing, font, shadow };
+export const layout = {
+  contentMaxWidth: 560,
+  touchTarget: 44,
+  inputHeight: 54,
+  buttonHeight: 54,
+
+  // شعار الهوية بثلاثة أحجام: نقطة انطلاق الانتقال المتصل (الإقلاع) ووجهتاه.
+  // وجود القياسات هنا يجعل انتقال الشعار محسوباً من نفس المصدر الذي ترسم منه
+  // الشاشة الهدف، بدل أرقام مكرّرة تتباعد مع أول تعديل.
+  logoSplash: 112,
+  logoBrand: 64, // رأس شاشة الدخول
+  logoBrandInline: 42, // شارة الهوية في رأس شاشة التعريف
+  headerBrandHeight: 52, // ارتفاع صفّ الهوية في رأس شاشة التعريف
+
+  progressTrack: 4, // سماكة شريط التقدّم غير المحدّد
+  progressWidth: 132,
+};
+
+export const motion = {
+  pressedScale: 0.985,
+  fast: 140,
+  normal: 220,
+  exit: 260, // تلاشي شاشة الإقلاع فوق الشاشة التالية بعد تركيبها
+
+  // إيقاع «إشارة الحياة»: بطيء عمداً. الحركة السريعة في شاشة انتظار تُقرأ
+  // كاستعجال وتزيد القلق بدل أن تطمئن.
+  breath: 1600,
+  sweep: 1150,
+
+  // خط زمن الإقلاع (يُقاس من لحظة تشغيل التطبيق)
+  minSplash: 600, // أدنى ظهور يمنع «وميض» الشاشة على الأجهزة السريعة
+  hintDelay: 3000, // بداية الإفصاح عن التأخير
+  slowHintDelay: 8000, // الاعتراف بأن الاتصال أبطأ من المعتاد
+  bootTimeout: 16000, // حارس نهائي فوق مهلة api (15s) بهامش ثانية
+};
+
+export default { colors, gradients, radius, spacing, font, shadow, layout, motion };

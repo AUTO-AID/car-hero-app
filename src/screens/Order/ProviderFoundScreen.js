@@ -1,40 +1,41 @@
-// ============================================================
-//  ProviderFoundScreen — ١٨ · تم العثور على فني  (القسم E)
-//  يستقبل orderId: GET /orders/:id/tracking + GET /providers/:id
-//  الاسم→provider.businessName · الهاتف→provider.phone
-//  الوقت→etaMinutes · المسافة→distanceKm · التقييم/التخصّص من providers/:id
-// ============================================================
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, View } from "react-native";
+import Text from "../../components/AppText";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ChatCircle, CheckCircle, NavigationArrow, Phone, Star } from "phosphor-react-native";
+import { EmptyState, OutlineButton, PrimaryButton } from "../../components/ui";
+import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { fetchTracking } from "../../services/ordersApi";
+import { fetchProvider, providerInitials, providerRole } from "../../services/providersApi";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Linking } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CheckCircle, Star, Phone, ChatCircle, NavigationArrow, WarningCircle } from 'phosphor-react-native';
-import { colors, radius, shadow, gradients } from '../../theme/theme';
-import { fetchTracking } from '../../services/ordersApi';
-import { fetchProvider, providerRole, providerInitials } from '../../services/providersApi';
-
-const fmt = (n) => (n == null ? '' : Number(n).toLocaleString('ar-EG'));
-const km = (d) => (d == null ? '—' : `${Number(d).toLocaleString('ar-EG', { maximumFractionDigits: 1 })} كم`);
+const formatNumber = (value) => (value == null ? "" : Number(value).toLocaleString("ar-EG"));
 
 export default function ProviderFoundScreen({ navigation, route }) {
+  const insets = useSafeAreaInsets();
   const orderId = route?.params?.orderId;
+  const scheduled = !!route?.params?.scheduled;
   const [tracking, setTracking] = useState(null);
   const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    if (!orderId) {
+      setError("رقم الطلب غير متوفر");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError("");
     try {
-      const trk = await fetchTracking(orderId);
-      setTracking(trk);
-      // التقييم والتخصّصات غير موجودة في التتبّع — اجلبها من providers/:id
-      const pid = trk?.provider?.id || trk?.providerId;
-      if (pid) {
-        try { setProvider(await fetchProvider(pid)); } catch (_) { /* ثانوي */ }
+      const result = await fetchTracking(orderId);
+      setTracking(result);
+      const providerId = result?.provider?.id || result?.provider?._id || result?.providerId;
+      if (providerId) {
+        try { setProvider(await fetchProvider(providerId)); } catch { setProvider(null); }
       }
-    } catch (e) {
-      setError(e?.message || 'تعذّر جلب حالة الطلب');
+    } catch (loadError) {
+      setError(loadError?.message || "تعذر جلب حالة الطلب");
     } finally {
       setLoading(false);
     }
@@ -42,97 +43,153 @@ export default function ProviderFoundScreen({ navigation, route }) {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) {
-    return <View style={[s.root, s.centerAll]}><ActivityIndicator color={colors.primary} /><Text style={s.stateText}>جارٍ تأكيد الفني…</Text></View>;
-  }
-  if (error) {
-    return (
-      <View style={[s.root, s.centerAll]}>
-        <WarningCircle size={46} weight="fill" color={colors.danger} />
-        <Text style={s.stateText}>{error}</Text>
-        <Pressable style={s.retry} onPress={load}><Text style={s.retryText}>إعادة المحاولة</Text></Pressable>
-      </View>
-    );
-  }
+  const embeddedProvider = tracking?.provider || {};
+  const providerId = embeddedProvider.id || embeddedProvider._id || provider?.id || provider?._id || tracking?.providerId;
+  const name = embeddedProvider.businessName || provider?.businessName || (scheduled ? "سيتم تعيين الفني قبل الموعد" : "جارٍ تعيين الفني");
+  const phone = embeddedProvider.phoneNumber || embeddedProvider.phone || provider?.phoneNumber || provider?.phone || "";
+  const rating = provider?.averageRating ?? embeddedProvider.averageRating;
+  const role = providerRole(provider) || embeddedProvider.city || "";
+  const initials = providerInitials(provider || embeddedProvider) || "CH";
+  // المركبة ولوحتها: التعرّف البصري على ما سيصل يخفض القلق أكثر من أي عنصر آخر
+  const vehicle = embeddedProvider.vehicle || provider?.vehicle || {};
+  const vehicleLabel = [vehicle.make, vehicle.model, vehicle.color].filter(Boolean).join(" ");
+  const plate = vehicle.plateNumber || vehicle.plate || "";
+  // انسحاب المزوّد ليس خطأ شبكة: يحتاج شرحاً ومساراً لإعادة البحث لا رسالة عطل
+  const withdrawn = ["cancelled", "rejected"].includes(tracking?.status);
 
-  const prov = tracking?.provider || {};
-  const name = prov.businessName || provider?.businessName || 'الفني';
-  const phone = prov.phone || provider?.phone;
-  const rating = provider?.averageRating;
-  const role = providerRole(provider) || prov.city || '';
-  const initials = providerInitials(provider || prov);
+  const call = () => {
+    const sanitized = String(phone).replace(/[^+\d]/g, "");
+    if (sanitized) Linking.openURL(`tel:${sanitized}`).catch(() => {});
+  };
 
   return (
-    <View style={s.root}>
-      <View style={s.check}><CheckCircle size={52} weight="fill" color={colors.success} /></View>
-      <Text style={s.title}>تم قبول طلبك!</Text>
-      <Text style={s.sub}>الفني في طريقه إليك الآن</Text>
-
-      <View style={s.card}>
-        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 14 }}>
-          <View style={s.avatar}><Text style={s.initials}>{initials}</Text></View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={s.name} numberOfLines={1}>{name}</Text>
-            <View style={s.ratingRow}>
-              {rating != null && (<><Star size={13} weight="fill" color={colors.star} /><Text style={s.rating}>{Number(rating).toFixed(1)}</Text></>)}
-              {role ? <Text style={s.role} numberOfLines={1}>{rating != null ? '· ' : ''}{role}</Text> : null}
-            </View>
+    <View style={styles.root}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.xxl, paddingBottom: insets.bottom + spacing.xl }]}
+      >
+        {loading ? (
+          <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={styles.stateText}>جاري تأكيد الطلب...</Text></View>
+        ) : error ? (
+          <View style={styles.recovery}>
+            <EmptyState title="تعذر تأكيد الطلب" message={error} />
+            {/* مسار استرداد حقيقي: إعادة المحاولة قد لا تُجدي إن سقط الطلب،
+                فنعرض معها البحث عن فني آخر بدل ترك المستخدم في طريق مسدود. */}
+            <PrimaryButton label="إعادة المحاولة" onPress={load} />
+            <OutlineButton
+              label="البحث عن فني آخر"
+              onPress={() => navigation?.replace?.("SearchingProvider", route?.params || {})}
+            />
           </View>
-        </View>
-        <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 16 }}>
-          <Pressable disabled={!phone} onPress={() => phone && Linking.openURL(`tel:${phone}`)} style={({ pressed }) => [s.callBtn, !phone && { opacity: 0.5 }, pressed && { transform: [{ scale: 0.96 }] }]}>
-            <Phone size={17} weight="fill" color="#fff" /><Text style={s.callText}>اتصال</Text>
-          </Pressable>
-          <Pressable onPress={() => navigation?.navigate?.('Chat', { orderId })} style={({ pressed }) => [s.chatBtn, pressed && { transform: [{ scale: 0.96 }] }]}>
-            <ChatCircle size={17} weight="fill" color={colors.primary} /><Text style={s.chatText}>محادثة</Text>
-          </Pressable>
-        </View>
-      </View>
+        ) : withdrawn ? (
+          <View style={styles.recovery}>
+            <EmptyState
+              title="انسحب الفني من الطلب"
+              message="يحدث هذا أحياناً إذا تعذّر على الفني الوصول. طلبك لم يُنفّذ ولم يُخصم منك شيء — سنبحث لك عن بديل فوراً."
+            />
+            <PrimaryButton
+              label="ابحث عن فني بديل"
+              onPress={() => navigation?.replace?.("SearchingProvider", route?.params || {})}
+            />
+            <OutlineButton label="العودة إلى طلباتي" onPress={() => navigation?.navigate?.("Orders")} />
+          </View>
+        ) : (
+          <>
+            <View style={styles.successIcon}><CheckCircle size={48} weight="fill" color={colors.success} /></View>
+            <Text style={styles.title}>{scheduled ? "تم تأكيد حجزك" : "تم قبول طلبك"}</Text>
+            <Text style={styles.subtitle}>{scheduled ? "ستتمكن من متابعة التفاصيل من شاشة الطلبات." : "يمكنك الآن متابعة حالة الفني وتحديثات الوصول."}</Text>
 
-      <View style={{ flexDirection: 'row-reverse', gap: 10, marginTop: 14 }}>
-        <View style={s.stat}><Text style={s.statLabel}>وقت الوصول</Text><Text style={s.statVal}>{tracking?.etaMinutes != null ? `${fmt(tracking.etaMinutes)} د` : '—'}</Text></View>
-        <View style={s.stat}><Text style={s.statLabel}>المسافة</Text><Text style={s.statVal}>{km(tracking?.distanceKm)}</Text></View>
-      </View>
+            <View style={styles.providerCard}>
+              <View style={styles.providerTop}>
+                <View style={styles.avatar}><Text style={styles.initials}>{initials}</Text></View>
+                <View style={styles.providerCopy}>
+                  <Text style={styles.providerName} numberOfLines={2}>{name}</Text>
+                  <View style={styles.ratingRow}>
+                    {rating != null ? <><Star size={13} weight="fill" color={colors.star} /><Text style={styles.rating}>{Number(rating).toFixed(1)}</Text></> : null}
+                    {role ? <Text style={styles.role} numberOfLines={1}>{role}</Text> : null}
+                  </View>
+                  {/* المركبة ولوحتها تحت الاسم مباشرةً: بها يتعرّف المستخدم
+                      على من يصل قبل أن يقترب */}
+                  {vehicleLabel || plate ? (
+                    <Text style={styles.vehicle} numberOfLines={1}>
+                      {[vehicleLabel, plate ? `لوحة ${plate}` : ""].filter(Boolean).join(" · ")}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+              {providerId ? (
+                <View style={styles.contactActions}>
+                  {/* الاتصال يأخذ وزن الإجراء الأساسي: على الطريق المكالمة
+                      أسرع وأوثق من محادثة قد لا تُقرأ فوراً. */}
+                  <PrimaryButton
+                    label="اتصال"
+                    icon={<Phone size={17} weight="fill" color={colors.onPrimary} />}
+                    onPress={call}
+                    disabled={!phone}
+                    style={styles.contactButton}
+                  />
+                  <OutlineButton label="محادثة" icon={<ChatCircle size={17} weight="fill" color={colors.primary} />} onPress={() => navigation?.navigate?.("Chat", { orderId, providerId, providerName: name })} style={styles.contactButton} />
+                </View>
+              ) : null}
+            </View>
 
-      <View style={{ flex: 1 }} />
-      <Pressable onPress={() => navigation?.replace?.('Tracking', { orderId })} style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}>
-        <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.cta, shadow.button]}>
-          <NavigationArrow size={18} weight="fill" color="#fff" />
-          <Text style={s.ctaText}>تتبّع الفني على الخريطة</Text>
-        </LinearGradient>
-      </Pressable>
+            {/* وقت الوصول هو السؤال الأول بعد «من هو» — يُعرض بارزاً لا كخانة
+                في صف إحصاءات متساوية الوزن. */}
+            <View style={styles.etaCard}>
+              <Text style={styles.etaLabel}>الوصول المتوقّع</Text>
+              <Text style={styles.etaValue}>
+                {tracking?.etaMinutes != null ? `${formatNumber(tracking.etaMinutes)} دقيقة` : "جارٍ التقدير"}
+              </Text>
+              {tracking?.distanceKm != null ? (
+                <Text style={styles.etaDistance}>يبعد {formatNumber(tracking.distanceKm)} كم عنك</Text>
+              ) : null}
+            </View>
+
+            <View style={styles.flex} />
+            <PrimaryButton
+              label={scheduled ? "عرض تفاصيل الحجز" : "متابعة الطلب"}
+              icon={<NavigationArrow size={18} weight="fill" color={colors.onPrimary} />}
+              onPress={() => scheduled
+                ? navigation?.replace?.("OrderDetail", { orderId })
+                : navigation?.replace?.("Tracking", { orderId })}
+            />
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff', paddingTop: 62, paddingHorizontal: 26, paddingBottom: 30 },
-  centerAll: { alignItems: 'center', justifyContent: 'center', gap: 12 },
-  stateText: { fontSize: 14, color: colors.textBody, textAlign: 'center' },
-  retry: { marginTop: 4, backgroundColor: colors.tint, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 22 },
-  retryText: { fontSize: 13.5, fontWeight: '700', color: colors.primary },
-
-  check: { width: 82, height: 82, borderRadius: 41, backgroundColor: colors.successBg, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
-  title: { marginTop: 20, fontSize: 22, fontWeight: '700', color: colors.textDark, textAlign: 'center' },
-  sub: { marginTop: 9, fontSize: 14, color: colors.textBody, textAlign: 'center' },
-
-  card: { marginTop: 24, backgroundColor: '#faf8fd', borderWidth: 1, borderColor: colors.border, borderRadius: 22, padding: 18 },
-  avatar: { width: 60, height: 60, borderRadius: 16, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 18, fontWeight: '700', color: colors.primary },
-  name: { fontSize: 16, fontWeight: '700', color: colors.textDark, textAlign: 'right' },
-  ratingRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4, marginTop: 4 },
-  rating: { fontSize: 12.5, color: colors.star, fontWeight: '700' },
-  role: { fontSize: 12, color: colors.textMuted },
-
-  callBtn: { flex: 1, height: 48, borderRadius: 14, backgroundColor: colors.primaryLight, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  callText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  chatBtn: { flex: 1, height: 48, borderRadius: 14, borderWidth: 1.5, borderColor: colors.borderInput, backgroundColor: '#fff', flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  chatText: { color: colors.primary, fontSize: 14, fontWeight: '700' },
-
-  stat: { flex: 1, backgroundColor: colors.tint, borderRadius: 16, padding: 14, alignItems: 'center' },
-  statLabel: { fontSize: 11.5, color: colors.textMuted },
-  statVal: { fontSize: 18, fontWeight: '700', color: colors.primary, marginTop: 3 },
-
-  cta: { height: 56, borderRadius: radius.lg, flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  ctaText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.screenBg },
+  content: { flexGrow: 1, width: "100%", maxWidth: layout.contentMaxWidth, alignSelf: "center", paddingHorizontal: spacing.screenH },
+  loading: { flex: 1, minHeight: 360, alignItems: "center", justifyContent: "center", gap: spacing.sm },
+  stateText: { fontSize: font.size.sm, color: colors.textMuted, textAlign: "center" },
+  successIcon: { width: 76, height: 76, borderRadius: radius.md, backgroundColor: colors.successBg, alignItems: "center", justifyContent: "center", alignSelf: "center" },
+  title: { marginTop: spacing.xl, fontSize: font.size.title, fontWeight: "700", color: colors.textDark, textAlign: "center" },
+  subtitle: { maxWidth: 380, alignSelf: "center", marginTop: spacing.sm, fontSize: font.size.sm, color: colors.textBody, lineHeight: 24, textAlign: "center" },
+  providerCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.lg, marginTop: spacing.xxl },
+  providerTop: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },
+  avatar: { width: 56, height: 56, flexShrink: 0, borderRadius: radius.md, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center" },
+  initials: { fontSize: font.size.body, fontWeight: "700", color: colors.primary },
+  providerCopy: { flex: 1, minWidth: 0 },
+  providerName: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "right" },
+  ratingRow: { flexDirection: "row-reverse", alignItems: "center", gap: 5, marginTop: 2 },
+  rating: { fontSize: font.size.xs, color: colors.star, fontWeight: "700" },
+  role: { flexShrink: 1, fontSize: font.size.xs, color: colors.textMuted },
+  contactActions: { flexDirection: "row-reverse", gap: spacing.sm, borderTopWidth: 1, borderTopColor: colors.borderSoft, paddingTop: spacing.md, marginTop: spacing.md },
+  contactButton: { flex: 1 },
+  vehicle: { fontSize: font.size.xs, color: colors.textBody, marginTop: 3, textAlign: "right" },
+  etaCard: {
+    alignItems: "center",
+    backgroundColor: colors.secondarySoft,
+    borderRadius: radius.card,
+    marginTop: spacing.md,
+    paddingVertical: spacing.lg,
+  },
+  etaLabel: { fontSize: font.size.xs, color: colors.textBody },
+  etaValue: { marginTop: 2, fontSize: font.size.h1, fontWeight: "700", color: colors.secondary, textAlign: "center" },
+  etaDistance: { marginTop: 2, fontSize: font.size.xs, color: colors.textMuted },
+  recovery: { flex: 1, justifyContent: "center", gap: spacing.sm },
+  flex: { flex: 1, minHeight: spacing.xxl },
 });
