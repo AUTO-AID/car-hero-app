@@ -18,16 +18,12 @@ import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import {
-  CaretLeft,
   ChatText,
-  CreditCard,
   DeviceMobile,
   EnvelopeSimple,
-  Info,
   ShieldCheck,
   SignOut,
   Trash,
-  UserCircleGear,
   WarningCircle,
 } from "phosphor-react-native";
 import {
@@ -174,15 +170,6 @@ export default function SettingsScreen({ navigation }) {
 
         <SectionHeader title="الإشعارات" style={styles.sectionHeader} />
 
-        {/* الفصل بين الحرج والتسويقي: يُقال صراحةً بدل مفتاح لا يُطبَّق */}
-        <View style={styles.note}>
-          <Info size={16} weight="fill" color={colors.info} />
-          <Text style={styles.noteText}>
-            تحديثات طلبك الجارية تظهر دائماً داخل التطبيق وفي شاشة الإشعارات مهما كانت المفاتيح — هذه المفاتيح
-            تتحكّم بقنوات التنبيه خارج الشاشة فقط.
-          </Text>
-        </View>
-
         {systemBlocked ? (
           <View style={styles.systemWarning}>
             <WarningCircle size={17} weight="fill" color={colors.warning} />
@@ -209,31 +196,6 @@ export default function SettingsScreen({ navigation }) {
               />
             </View>
           ))}
-        </View>
-
-        <SectionHeader title="الحساب والدعم" style={styles.sectionHeader} />
-        <View style={styles.card}>
-          <NavigationRow
-            label="طرق الدفع"
-            description="إدارة وسائل الدفع المحفوظة"
-            Icon={CreditCard}
-            onPress={() => navigation?.navigate?.("PaymentMethods")}
-          />
-          <View style={styles.divider} />
-          <NavigationRow
-            label="الدعم والمحادثات"
-            description="راجع محادثاتك أو تواصل مع الدعم"
-            Icon={ChatText}
-            tone="secondary"
-            onPress={() => navigation?.navigate?.("Conversations")}
-          />
-          <View style={styles.divider} />
-          <NavigationRow
-            label="إدارة الحساب"
-            description="استعادة حساب معطّل أو متابعة حالته"
-            Icon={UserCircleGear}
-            onPress={() => navigation?.navigate?.("RestoreAccount")}
-          />
         </View>
 
         <SectionHeader title="الخصوصية والبيانات" style={styles.sectionHeader} />
@@ -359,29 +321,6 @@ function PreferenceSwitch({ label, description, warning, Icon, value, saving, di
   );
 }
 
-function NavigationRow({ label, description, Icon, tone = "primary", onPress }) {
-  const toneColor = tone === "secondary" ? colors.secondary : tone === "danger" ? colors.danger : colors.primary;
-  const toneBackground = tone === "secondary" ? colors.secondarySoft : tone === "danger" ? colors.dangerBg : colors.tint;
-
-  return (
-    <PressableScale
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityHint={description}
-      style={styles.navigationRow}
-    >
-      <View style={[styles.navigationIcon, { backgroundColor: toneBackground }]}>
-        <Icon size={20} color={toneColor} weight="duotone" />
-      </View>
-      <View style={styles.navigationCopy}>
-        <Text style={styles.rowTitle}>{label}</Text>
-        <Text style={styles.rowDescription}>{description}</Text>
-      </View>
-      <CaretLeft size={18} color={colors.textMuted2} />
-    </PressableScale>
-  );
-}
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.screenBg },
@@ -394,16 +333,6 @@ const styles = StyleSheet.create({
   banner: { marginTop: spacing.md },
   sectionHeader: { marginTop: spacing.xl, marginBottom: spacing.sm },
 
-  note: {
-    flexDirection: "row-reverse",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-    backgroundColor: colors.infoBg,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  noteText: { flex: 1, fontSize: font.size.xs, color: colors.info, textAlign: "right", lineHeight: 19 },
   systemWarning: {
     flexDirection: "row-reverse",
     alignItems: "flex-start",
@@ -457,22 +386,6 @@ const styles = StyleSheet.create({
   rowWarning: { fontSize: font.size.xxs, color: colors.warning, marginTop: 4, textAlign: "right", lineHeight: 17 },
   rowSaving: { fontSize: font.size.xxs, color: colors.primary, marginTop: 4, textAlign: "right" },
 
-  navigationRow: {
-    minHeight: 68,
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  navigationIcon: {
-    width: 38,
-    height: 38,
-    flexShrink: 0,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navigationCopy: { flex: 1, minWidth: 0 },
 
   privacyRow: { flexDirection: "row-reverse", alignItems: "flex-start", gap: spacing.md, padding: spacing.md },
   privacyIcon: {

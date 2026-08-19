@@ -13,7 +13,6 @@ import {
   Key,
   Lightning,
   MapPin,
-  SquaresFour,
   Tag,
   Tire,
   Truck,
@@ -43,11 +42,15 @@ const ICONS = {
   emergency: Lightning,
 };
 
+// الاختصارات تحمل الوجهات التي لا يصلها الشريط السفلي.
+//
+// كانت أربعة، اثنتان منها تكرّران تبويبين دائمَي الظهور: «كل الخدمات» تفتح
+// setStep("services") — وهو بالضبط ما يفعله تبويب «الخدمات» — و«طلباتي»
+// تفتح setStep("orders") مثل تبويب «الطلبات». أي أن الصفّ الثاني كان
+// يعرض طريقاً ثانياً إلى مكان يبعد ضغطة واحدة أصلاً.
 const QUICK_ACTIONS = [
-  { key: "services", Icon: SquaresFour, label: "كل الخدمات", tone: colors.primary, bg: colors.tint },
   { key: "providers", Icon: MapPin, label: "المزودون القريبون", tone: colors.secondary, bg: colors.secondarySoft },
   { key: "offers", Icon: Tag, label: "العروض", tone: colors.accent, bg: colors.accentSoft },
-  { key: "orders", Icon: Truck, label: "طلباتي", tone: colors.info, bg: colors.infoBg },
 ];
 
 const iconFor = (service) => ICONS[service?.category] || Wrench;
@@ -59,7 +62,6 @@ export default function HomeScreen({
   onOpenMapExplore,
   onPickLocation,
   onOpenOffers,
-  onOpenOrders,
   onOpenCatalog,
   onOpenNotifications,
   onSelectService,
@@ -123,10 +125,8 @@ export default function HomeScreen({
   }, [location]);
 
   const quickHandlers = {
-    services: onOpenCatalog,
     providers: onOpenMapExplore,
     offers: onOpenOffers,
-    orders: onOpenOrders,
   };
 
   return (

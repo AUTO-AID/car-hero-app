@@ -14,6 +14,7 @@ import {
   ErrorBanner,
   InputField,
   LinkText,
+  PasswordStrength,
   PrimaryButton,
   ScreenContainer,
 } from "../../components/ui";
@@ -117,36 +118,9 @@ export default function ResetPasswordScreen({
           icon={<LockSimple size={20} color={colors.primary} />}
         />
 
-        {/* الأشرطة تقيس الإلزامي وحده: احتساب التوصيات كان يجعل كلمة صالحة
-            تبدو ناقصة، فيظنّ المستخدم أنها سترفَض. */}
-        <View
-          style={styles.strengthBars}
-          accessibilityRole="progressbar"
-          accessibilityLabel={`استوفيت ${metRequired} من ${required.length} شروط إلزامية`}
-        >
-          {required.map((rule, index) => (
-            <View key={rule.key} style={[styles.strengthBar, index < metRequired && styles.strengthBarActive]} />
-          ))}
-        </View>
-
-        <View style={styles.rules}>
-          {rulesState.map((rule) => (
-            <View key={rule.key} style={styles.rule}>
-              <View style={[styles.ruleCheck, rule.met && styles.ruleCheckActive]}>
-                {rule.met ? <Check size={11} weight="bold" color={colors.onPrimary} /> : null}
-              </View>
-              <Text
-                style={[
-                  styles.ruleText,
-                  rule.met && styles.ruleTextActive,
-                  !rule.required && styles.ruleTextOptional,
-                ]}
-              >
-                {rule.required ? rule.label : `${rule.label} — اختياري`}
-              </Text>
-            </View>
-          ))}
-        </View>
+        {/* كان الشريط المقسّم والقائمة الخمسية يظهران معاً فيقولان الشيء
+            نفسه مرّتين. المكوّن المشترك يجمعهما في سطرين. */}
+        <PasswordStrength rules={rulesState} optionalNote="اختياري" />
 
         <InputField
           label="تأكيد كلمة المرور"
@@ -229,25 +203,6 @@ const styles = StyleSheet.create({
   title: { marginTop: spacing.xl, textAlign: "center", fontSize: font.size.title, fontWeight: "700", color: colors.textDark },
   body: { maxWidth: 380, alignSelf: "center", marginTop: spacing.sm, textAlign: "center", fontSize: font.size.sm, color: colors.textBody, lineHeight: 24 },
   form: { marginTop: spacing.xxl, gap: spacing.lg },
-  strengthBars: { flexDirection: "row-reverse", gap: 5, marginTop: -10 },
-  strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
-  strengthBarActive: { backgroundColor: colors.success },
-  rules: { flexDirection: "row-reverse", flexWrap: "wrap", gap: spacing.sm },
-  rule: { width: "48%", minHeight: 28, flexDirection: "row-reverse", alignItems: "center", gap: 6 },
-  ruleCheck: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.borderInput,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ruleCheckActive: { borderColor: colors.success, backgroundColor: colors.success },
-  ruleText: { flex: 1, fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
-  ruleTextActive: { color: colors.success, fontWeight: "600" },
-  ruleTextOptional: { color: colors.textMuted2 },
   matchRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.xs, marginTop: -spacing.sm },
   matchText: { fontSize: font.size.xs, color: colors.success, fontWeight: "600" },
   newCodeLink: { textAlign: "center", fontSize: font.size.sm },

@@ -15,7 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Info, Lock, Phone, User } from "phosphor-react-native";
+import { Lock, Phone, User } from "phosphor-react-native";
 import {
   AppHeader,
   AsyncContent,
@@ -145,7 +145,6 @@ export default function EditProfileScreen({ navigation }) {
                 onBlur={() => setTouched(true)}
                 placeholder="الاسم الكامل"
                 error={nameError}
-                helper={nameError ? undefined : "يظهر للفني عند قبول طلبك"}
                 maxLength={120}
                 returnKeyType="done"
                 onSubmitEditing={save}
@@ -162,16 +161,6 @@ export default function EditProfileScreen({ navigation }) {
                   </View>
                   <Lock size={16} color={colors.textMuted2} />
                 </View>
-                <Text style={styles.lockedReason}>
-                  رقمك هو معرّف حسابك ولا يمكن تغييره من التطبيق. للتغيير تواصل مع الدعم.
-                </Text>
-              </View>
-
-              <View style={styles.note}>
-                <Info size={16} weight="fill" color={colors.info} />
-                <Text style={styles.noteText}>
-                  تفضيلات اللغة والإشعارات صارت في «الإعدادات»، وبيانات المركبات في «مركباتي».
-                </Text>
               </View>
 
               <ErrorBanner message={actionError} style={styles.banner} />
@@ -244,18 +233,7 @@ const styles = StyleSheet.create({
   lockedCopy: { flex: 1, minWidth: 0 },
   lockedLabel: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right" },
   lockedValue: { fontSize: font.size.md, fontWeight: "700", color: colors.textBody, textAlign: "right", marginTop: 1 },
-  lockedReason: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "right", lineHeight: 18 },
 
-  note: {
-    flexDirection: "row-reverse",
-    alignItems: "flex-start",
-    gap: spacing.sm,
-    backgroundColor: colors.infoBg,
-    borderRadius: radius.sm,
-    padding: spacing.md,
-    marginTop: spacing.md,
-  },
-  noteText: { flex: 1, fontSize: font.size.xs, color: colors.info, textAlign: "right", lineHeight: 19 },
 
   banner: { marginTop: spacing.md },
 

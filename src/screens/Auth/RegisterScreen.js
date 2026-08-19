@@ -24,6 +24,7 @@ import {
   ErrorBanner,
   InputField,
   LinkText,
+  PasswordStrength,
   PhoneField,
   PressableScale,
   PrimaryButton,
@@ -142,8 +143,6 @@ export default function RegisterScreen({
     () => PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) })),
     [password]
   );
-  const metRequired = rulesState.filter((rule) => rule.required && rule.met).length;
-  const totalRequired = rulesState.filter((rule) => rule.required).length;
   const confirmMatches = confirm.length > 0 && confirm === password;
 
   const submit = () => {
@@ -201,12 +200,10 @@ export default function RegisterScreen({
       >
         <View style={styles.brand}>
           <Image
-            source={require("../../../assets/carhero-app-icon.png")}
+            source={require("../../../assets/carhero-logo.png")}
             style={styles.logo}
-            alt=""
-            aria-hidden
+            accessibilityLabel="Car Hero"
           />
-          <Text style={styles.brandName}>Car Hero</Text>
         </View>
 
         <View style={styles.intro}>
@@ -286,32 +283,9 @@ export default function RegisterScreen({
               icon={<LockSimple size={20} color={colors.primary} />}
             />
 
-            {/* قائمة حيّة تُشطب مع الكتابة: ترشد نحو كلمة مرور صالحة أثناء
-                تأليفها، بدل رسالة رفض عامة تصل بعد فوات الأوان. */}
-            {showRules ? (
-              <View
-                style={styles.rules}
-                accessibilityLiveRegion="polite"
-                accessibilityLabel={`استوفيت ${metRequired} من ${totalRequired} شروط إلزامية`}
-              >
-                {rulesState.map((rule) => (
-                  <View key={rule.key} style={styles.ruleRow}>
-                    <View style={[styles.ruleMark, rule.met && styles.ruleMarkMet]}>
-                      {rule.met ? <Check size={11} weight="bold" color={colors.onPrimary} /> : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.ruleText,
-                        rule.met && styles.ruleTextMet,
-                        !rule.required && styles.ruleTextOptional,
-                      ]}
-                    >
-                      {rule.required ? rule.label : `${rule.label} — يزيد الأمان`}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
+            {/* إرشاد حيّ أثناء التأليف — يعرض ما ينقص لا ما اكتمل.
+                كان هنا خمسة صفوف مكدّسة تبقى خضراء بعد استيفائها كلّها. */}
+            {showRules ? <PasswordStrength rules={rulesState} /> : null}
           </View>
 
           <View>
@@ -437,14 +411,14 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     paddingHorizontal: spacing.screenH,
   },
-  brand: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
+  brand: { alignItems: "center" },
+  // نفس قياس رأس شاشة الدخول: الشاشتان توأمان في تدفّق واحد، واختلاف حجم
+  // الشعار بينهما يُقرأ كقفزة عند التنقّل بينهما.
+  logo: {
+    width: layout.logoBrand,
+    height: layout.logoBrand / layout.logoAspect,
+    resizeMode: "contain",
   },
-  logo: { width: 54, height: 54, borderRadius: radius.md },
-  brandName: { fontSize: font.size.title, fontWeight: "700", color: colors.primary },
   intro: { alignItems: "flex-end", marginTop: spacing.xxl },
   title: { fontSize: font.size.h1, fontWeight: "700", color: colors.textDark, textAlign: "right" },
   subtitle: {
@@ -457,22 +431,7 @@ const styles = StyleSheet.create({
   },
   form: { gap: spacing.lg, marginTop: spacing.xl },
 
-  rules: { marginTop: spacing.sm, gap: 6 },
-  ruleRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
-  ruleMark: {
-    width: 16,
-    height: 16,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.borderInput,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ruleMarkMet: { backgroundColor: colors.success, borderColor: colors.success },
-  ruleText: { fontSize: font.size.xs, color: colors.textBody, textAlign: "right" },
   // الشطب + الأيقونة + اللون: ثلاث إشارات، فلا تعتمد الحالة على اللون وحده
-  ruleTextMet: { color: colors.textMuted2, textDecorationLine: "line-through" },
-  ruleTextOptional: { color: colors.textMuted2 },
 
   matchRow: {
     flexDirection: "row-reverse",

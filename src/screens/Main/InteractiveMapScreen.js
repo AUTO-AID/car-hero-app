@@ -15,6 +15,7 @@ import { ArrowRight, MagnifyingGlass, Crosshair, MapPin, Info, X, WarningCircle 
 import { colors, font, radius, shadow, gradients, spacing } from "../../theme/theme";
 import { reverseGeocode, searchPlaces } from "../../services/geocoding";
 import { getCurrentLocation } from "../../services/locationService";
+import { tileTemplate } from "../../services/geocoding";
 
 // react-native-webview غير مدعوم على الويب — نُحمّله فقط على الأجهزة
 let WebView = null;
@@ -88,7 +89,10 @@ export default function InteractiveMapScreen({
   <script>
     var start = { lat: ${startLat}, lng: ${startLng} };
     var map = L.map('map', { zoomControl: false }).setView([start.lat, start.lng], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    // القالب يأتي من الإعداد: خادم OSM العام يحجب التطبيقات الموزَّعة.
+    // بلا مزوّد تبقى الخريطة رمادية والدبّوس يعمل — أفضل من بلاطات «محجوب».
+    var tileTpl = ${JSON.stringify(tileTemplate())};
+    if (tileTpl) { L.tileLayer(tileTpl, { maxZoom: 19 }).addTo(map); }
 
     function post(obj){
       var msg = JSON.stringify(obj);

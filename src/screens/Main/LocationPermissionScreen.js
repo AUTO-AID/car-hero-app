@@ -13,12 +13,10 @@
 // ============================================================
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, Platform, StyleSheet, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Defs, RadialGradient as SvgRG, Stop } from "react-native-svg";
 import {
   CarBattery,
   CarProfile,
-  ClockCountdown,
   Crosshair,
   Gear,
   GpsSlash,
@@ -44,7 +42,7 @@ import {
   openLocationSettings,
   requestPermission,
 } from "../../services/locationService";
-import { colors, font, gradients, layout, radius, shadow, spacing } from "../../theme/theme";
+import { colors, font, layout, radius, shadow, spacing } from "../../theme/theme";
 
 const arNum = (value) => Number(value).toLocaleString("ar-EG");
 
@@ -53,35 +51,6 @@ const RING_SOFT = `${colors.primaryLight}30`;
 const RING_STRONG = `${colors.primaryLight}40`;
 const RING_FILL = `${colors.primaryLight}1f`;
 
-// الأسئلة الثلاثة التي يجب أن يجيبها التمهيد بصياغة ملموسة لا تسويقية:
-// ماذا نستخدمه فيه؟ متى؟ وماذا لو رفضت؟ — الإجابة الثالثة تحديداً هي ما
-// يرفع معدل الموافقة، لأنها تزيل شعور الإجبار وتُبقي للرافض طريقاً.
-const PRIMING = [
-  {
-    key: "why",
-    Icon: Crosshair,
-    bg: colors.tint,
-    fg: colors.primary,
-    question: "ماذا نستخدم الموقع فيه؟",
-    answer: "لإرسال أقرب فني إليك، بدل أن تصف موقعك بالكلام على الهاتف.",
-  },
-  {
-    key: "when",
-    Icon: ClockCountdown,
-    bg: colors.successBg,
-    fg: colors.success,
-    question: "متى نستخدمه؟",
-    answer: "أثناء طلبك فقط. لا نتتبّعك حين لا يكون لديك طلب نشط.",
-  },
-  {
-    key: "refuse",
-    Icon: PencilSimple,
-    bg: colors.warningBg,
-    fg: colors.warning,
-    question: "وماذا لو رفضت؟",
-    answer: "يمكنك إدخال موقعك يدوياً على الخريطة، لكن الوصول سيستغرق وقتاً أطول.",
-  },
-];
 
 // خطوات الإعدادات تختلف جذرياً بين الجوال والويب: توجيه مستخدم المتصفّح
 // إلى «إعدادات التطبيق» يرسله إلى مكان لا وجود له.
@@ -127,7 +96,10 @@ export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
     let alive = true;
     (async () => {
       try {
-        const coords = await getCoords({ force: true, allowRequest: true });
+        // بلا force: هذه شاشة عبور، وظيفتها قراءة الإحداثيات والخروج.
+        // فرضُ تثبيت طازج كان يجعلها تنتظر الراديو في كل فتح للتطبيق، بينما
+        // آخر موضع يعرفه النظام يكفي تماماً لإيجاد أقرب فنيّ.
+        const coords = await getCoords({ allowRequest: true });
         if (alive) onDone?.(coords);
       } catch {
         if (alive) {
@@ -233,20 +205,11 @@ export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
   return (
     <ScreenContainer>
       <View style={s.brand}>
-        <LinearGradient
-          colors={gradients.logoTile}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+        <Image
+          source={require("../../../assets/carhero-logo.png")}
           style={s.logo}
-        >
-          <Image
-            source={require("../../../assets/carhero-app-icon.png")}
-            style={s.logoImage}
-            alt=""
-            aria-hidden
-          />
-        </LinearGradient>
-        <Text style={s.brandName}>Car Hero</Text>
+          accessibilityLabel="Car Hero"
+        />
       </View>
 
       {isResolving ? (
@@ -322,7 +285,7 @@ export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
 
           <Text style={s.sub}>
             {isPriming
-              ? "قبل أن يسألك جهازك، إليك بالضبط ما سنفعله بموقعك — وما البديل إن رفضت."
+              ? "نستخدمه أثناء طلبك فقط لإرسال أقرب فني إليك، ولا نتتبّعك بعد ذلك. وإن رفضت يمكنك تحديد موقعك يدوياً على الخريطة."
               : null}
             {status === PERMISSION.DENIED
               ? "بدون الموقع لن نستطيع إرسال أقرب فني تلقائياً. يمكنك المحاولة مجدداً، أو إدخال موقعك يدوياً والمتابعة الآن."
@@ -337,22 +300,6 @@ export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
               ? "الإذن ممنوح لكن الجهاز لم يُرجع إحداثيات. قد تكون الإشارة ضعيفة داخل مبنى أو نفق."
               : null}
           </Text>
-
-          {isPriming ? (
-            <View style={s.primingList}>
-              {PRIMING.map((item) => (
-                <View key={item.key} style={s.primingRow}>
-                  <View style={[s.primingIcon, { backgroundColor: item.bg }]} aria-hidden>
-                    <item.Icon size={20} weight="fill" color={item.fg} />
-                  </View>
-                  <View style={s.primingText}>
-                    <Text style={s.primingQuestion}>{item.question}</Text>
-                    <Text style={s.primingAnswer}>{item.answer}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
 
           {status === PERMISSION.BLOCKED ? (
             <View style={s.steps}>
@@ -446,23 +393,14 @@ export default function LocationPermissionScreen({ onDone, onPickFromMap }) {
 }
 
 const s = StyleSheet.create({
-  brand: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.md,
-  },
+  brand: { alignItems: "center" },
+  // قياس الرأس المصغّر: الشعار وحده يكفي هنا، فالشاشة ليست شاشة هوية بل
+  // خطوة إذن — أي حجم أكبر يسحب الانتباه من الطلب نفسه.
   logo: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.xs,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
+    width: layout.logoBrandInline,
+    height: layout.logoBrandInline / layout.logoAspect,
+    resizeMode: "contain",
   },
-  logoImage: { width: 32, height: 32, resizeMode: "contain" },
-  brandName: { fontSize: 19, fontWeight: "700", color: colors.textHeading },
 
   resolving: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: spacing.xxl },
   resolvingText: { fontSize: font.size.sm, color: colors.textMuted, textAlign: "center" },
@@ -528,33 +466,6 @@ const s = StyleSheet.create({
     lineHeight: 25,
   },
 
-  primingList: { marginTop: spacing.xl, gap: spacing.sm },
-  primingRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  primingIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primingText: { flex: 1, minWidth: 0 },
-  primingQuestion: { fontSize: font.size.md, fontWeight: "700", color: colors.textDark, textAlign: "right" },
-  primingAnswer: {
-    marginTop: 2,
-    fontSize: font.size.sm,
-    color: colors.textBody,
-    lineHeight: 21,
-    textAlign: "right",
-  },
 
   steps: { marginTop: spacing.lg, gap: spacing.sm },
   stepRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.md },

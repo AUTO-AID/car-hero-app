@@ -19,7 +19,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, ArrowRight, CarProfile } from "phosphor-react-native";
+import { ArrowLeft, ArrowRight } from "phosphor-react-native";
 import Text from "../../components/AppText";
 import { IconButton, OutlineButton, PressableScale, PrimaryButton } from "../../components/ui";
 import useReducedMotion from "../../hooks/useReducedMotion";
@@ -42,17 +42,18 @@ const SLIDES = [
   },
   {
     key: "price",
-    // «بكم؟» — أكبر سبب للتردّد والإلغاء في خدمات الطريق. الصورة تُظهر
-    // لحظة النظر إلى التطبيق قبل القرار، لا لحظة العطل.
-    image: require("../../../assets/slide4.jpg"),
+    // «بكم؟» — أكبر سبب للتردّد والإلغاء في خدمات الطريق. الصورة تعرض شاشة
+    // الدفع نفسها بسعرها الظاهر قبل زر التأكيد: وعدٌ يُرى لا يُوصف.
+    image: require("../../../assets/slide-price.jpg"),
     title: "السعر تعرفه قبل التأكيد",
     body: "تظهر التكلفة كاملة قبل الضغط على «تأكيد الطلب». لا مفاجآت بعد وصول الفني.",
   },
   {
     key: "tracking",
     // «أين هو الآن؟» — قلق الانتظار. التتبّع يحوّل انتظاراً مجهولاً إلى
-    // انتظار معلوم، وهو ما يخفض الإلغاء بعد الطلب.
-    image: require("../../../assets/live-tracking.png"),
+    // انتظار معلوم، وهو ما يخفض الإلغاء بعد الطلب. الخريطة بدبابيس الفنيين
+    // حولك تجيب السؤال قبل طرحه.
+    image: require("../../../assets/slide-tracking.jpg"),
     title: "تابع الفني لحظة بلحظة",
     body: "شاهد موقع الفني على الخريطة ووقت وصوله المتوقّع، وتواصل معه مباشرة حتى انتهاء العمل.",
   },
@@ -177,12 +178,11 @@ export default function OnboardingScreen({ onRegister, onLogin, onSkip }) {
         ]}
       >
         <View style={styles.header}>
-          <View style={styles.brand}>
-            <View style={styles.brandIcon}>
-              <CarProfile size={24} weight="fill" color={colors.primary} />
-            </View>
-            <Text style={styles.brandName}>Car Hero</Text>
-          </View>
+          <Image
+            source={require("../../../assets/carhero-logo.png")}
+            style={styles.brand}
+            accessibilityLabel="Car Hero"
+          />
           {/* «تخطّي» ظاهر من الشريحة الأولى: إخفاؤه لا يزيد المشاهدة بل
               الإحباط والارتداد. والتلميح يقول أين يذهب — «تخطّي» وحدها
               لا تُفصح عن الوجهة. */}
@@ -332,16 +332,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenH,
     marginBottom: spacing.md,
   },
-  brand: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
-  brandIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radius.sm,
-    backgroundColor: colors.tint,
-    alignItems: "center",
-    justifyContent: "center",
+  // وجهة الشعار الطائر من شاشة الإقلاع: نفس الملف ونفس القياس المعرّف في
+  // theme، وإلا «هبط» الشعار على شكل مختلف عن الذي انطلق به.
+  brand: {
+    width: layout.logoBrandInline,
+    height: layout.logoBrandInline / layout.logoAspect,
+    resizeMode: "contain",
   },
-  brandName: { fontSize: 19, fontWeight: "700", color: colors.textDark },
   skip: { minWidth: 54, minHeight: layout.touchTarget, alignItems: "center", justifyContent: "center" },
   skipText: { fontSize: font.size.sm, fontWeight: "600", color: colors.textMuted },
 

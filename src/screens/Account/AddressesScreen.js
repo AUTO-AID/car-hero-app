@@ -93,6 +93,8 @@ export default function AddressesScreen({ navigation }) {
   const [line, setLine] = useState("");
   const [note, setNote] = useState("");
   const [coords, setCoords] = useState(null);
+  const [tileFailed, setTileFailed] = useState(false);
+  const tileUri = coords ? tileUrlFor(coords.latitude, coords.longitude) : null;
   const [locating, setLocating] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -141,6 +143,7 @@ export default function AddressesScreen({ navigation }) {
       setLine(address.addressLine || "");
       setNote(address.note || "");
       setCoords(coordsOf(address));
+      setTileFailed(false);
       setEditing(address);
       return;
     }
@@ -307,11 +310,22 @@ export default function AddressesScreen({ navigation }) {
             <Text style={styles.fieldLabel}>الموقع على الخريطة</Text>
             {coords ? (
               <View style={styles.mapPreview}>
-                <Image
-                  source={{ uri: tileUrlFor(coords.latitude, coords.longitude) }}
-                  style={styles.mapImage}
-                  alt=""
-                />
+                {/* المعاينة تحسين لا شرط: إن تعذّرت البلاطة نعرض بديلاً من
+                    نظامنا بدل ترك صورة الخادم الأجنبية تظهر داخل الشاشة */}
+                {tileUri && !tileFailed ? (
+                  <Image
+                    source={{ uri: tileUri }}
+                    style={styles.mapImage}
+                    onError={() => setTileFailed(true)}
+                    alt=""
+                  />
+                ) : (
+                  <View style={[styles.mapImage, styles.mapFallback]}>
+                    <Text style={styles.mapFallbackText}>
+                      {`${coords.latitude.toFixed(5)}، ${coords.longitude.toFixed(5)}`}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.mapPin}><MapPin size={20} weight="fill" color={colors.primary} /></View>
               </View>
             ) : (
@@ -437,6 +451,7 @@ function AddressCard({ address, onPress, onMenu }) {
   const Icon = iconFor(address.label);
   const coords = coordsOf(address);
   const tile = coords ? tileUrlFor(coords.latitude, coords.longitude) : null;
+  const [thumbFailed, setThumbFailed] = useState(false);
 
   return (
     <View style={[styles.card, address.isDefault && styles.cardDefault]}>
@@ -448,9 +463,14 @@ function AddressCard({ address, onPress, onMenu }) {
         style={styles.cardMain}
       >
         {/* معاينة مصغّرة: التعرّف البصري أسرع من قراءة سطر عنوان */}
-        {tile ? (
+        {tile && !thumbFailed ? (
           <View style={styles.thumb}>
-            <Image source={{ uri: tile }} style={styles.thumbImage} alt="" />
+            <Image
+              source={{ uri: tile }}
+              style={styles.thumbImage}
+              onError={() => setThumbFailed(true)}
+              alt=""
+            />
             <View style={styles.thumbPin}><Icon size={14} weight="fill" color={colors.onPrimary} /></View>
           </View>
         ) : (
@@ -577,6 +597,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mapImage: { ...StyleSheet.absoluteFillObject },
+  mapFallback: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceAlt || colors.tint },
+  mapFallbackText: { fontSize: font.size.xs, color: colors.textMuted2, fontVariant: ["tabular-nums"] },
   mapPin: {
     width: 38,
     height: 38,

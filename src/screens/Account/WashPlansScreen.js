@@ -275,6 +275,8 @@ export default function WashPlansScreen({ navigation }) {
                       items={vehicles.map((vehicle) => ({ value: itemId(vehicle), label: vehicleTitle(vehicle) }))}
                       value={vehicleId}
                       onChange={setVehicleId}
+                      addLabel="مركبة أخرى"
+                      onAdd={() => navigation?.navigate?.("Vehicles")}
                     />
                   </Field>
 
@@ -283,6 +285,8 @@ export default function WashPlansScreen({ navigation }) {
                       items={addresses.map((address) => ({ value: itemId(address), label: address.label || "عنوان" }))}
                       value={addressId}
                       onChange={setAddressId}
+                      addLabel="عنوان آخر"
+                      onAdd={() => navigation?.navigate?.("Addresses")}
                     />
                   </Field>
 
@@ -433,8 +437,16 @@ function Field({ label, children }) {
   );
 }
 
-function Choices({ items, value, onChange }) {
-  if (!items.length) return <Text style={styles.emptyChoice}>لا خيارات متاحة</Text>;
+/**
+ * صفّ اختيارات.
+ *
+ * `addLabel` + `onAdd` يعالجان حالة الخيار الواحد: حين يملك المستخدم مركبة
+ * واحدة أو عنواناً واحداً كان الصفّ يعرض زرّاً مختاراً وحيداً بلا بديل، فيبدو
+ * كحقل مقفل — ولا شيء يقول إن سبب غياب البدائل هو أنه لم يضف غيره بعد،
+ * ولا كيف يضيف. الشريحة الإضافية تفتح الشاشة المناسبة بدل أن تختار قيمة.
+ */
+function Choices({ items, value, onChange, addLabel, onAdd }) {
+  if (!items.length && !onAdd) return <Text style={styles.emptyChoice}>لا خيارات متاحة</Text>;
   return (
     <View style={styles.choices}>
       {items.map((item) => {
@@ -452,6 +464,17 @@ function Choices({ items, value, onChange }) {
           </PressableScale>
         );
       })}
+      {onAdd ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={addLabel}
+          onPress={onAdd}
+          style={[styles.choice, styles.choiceAdd]}
+        >
+          <Plus size={14} weight="bold" color={colors.primary} />
+          <Text style={[styles.choiceText, styles.choiceAddText]} numberOfLines={1}>{addLabel}</Text>
+        </PressableScale>
+      ) : null}
     </View>
   );
 }
@@ -542,6 +565,16 @@ const styles = StyleSheet.create({
   choiceActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   choiceText: { fontSize: font.size.xs, fontWeight: "700", color: colors.textHeading },
   choiceTextActive: { color: colors.onPrimary },
+  // شريحة الإضافة تُقرأ كإجراء لا كخيار محدَّد: حدّ متقطّع وبلا تعبئة
+  choiceAdd: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "transparent",
+    borderStyle: "dashed",
+    borderColor: colors.primary,
+  },
+  choiceAddText: { color: colors.primary },
   emptyChoice: { fontSize: font.size.xs, color: colors.textMuted, textAlign: "right" },
   formActions: { flexDirection: "row-reverse", gap: spacing.sm },
   grow: { flex: 1, width: "auto" },

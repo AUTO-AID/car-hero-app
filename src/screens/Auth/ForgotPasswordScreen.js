@@ -22,12 +22,16 @@ import { validatePhone } from "../../services/validators";
 const RETRY_SECONDS = 60;
 const arNum = (value) => Number(value).toLocaleString("ar-EG");
 
-// أي رسالة تكشف وجود الحساب من عدمه تُستبدل بصياغة محايدة
+// أي رسالة تكشف وجود الحساب من عدمه تُسقَط بالكامل، ولا تُستبدل بصياغة
+// محايدة: البديل المحايد يقول ما تقوله ملاحظة الخصوصية الثابتة أسفل الشاشة
+// حرفياً، فيظهر النصّ نفسه مرّتين — ومرّةً منهما داخل شريط أحمر دوره الإنذار،
+// فيُقرأ «تمّ الإرسال» على أنه فشل. الإسقاط يجعل مسار «رقم غير مسجّل» مطابقاً
+// تماماً لمسار النجاح (عدّاد تنازلي بلا إنذار)، وهو المطلوب أمنياً أصلاً.
+// تمرّ بقيّة الأخطاء (انقطاع الشبكة، تجاوز الحدّ، عطل الخادم) كما هي — إخفاؤها
+// يترك المستخدم أمام زر لا يستجيب بلا سبب.
 const REVEALS_ACCOUNT = /لا يوجد حساب|غير مسجّل|غير مسجل|not found/i;
-const neutralize = (message) =>
-  message && REVEALS_ACCOUNT.test(message)
-    ? "إن كان الرقم مسجّلاً فسيصلك الرمز خلال دقيقة."
-    : message;
+const withoutAccountReveal = (message) =>
+  message && REVEALS_ACCOUNT.test(message) ? "" : message;
 
 export default function ForgotPasswordScreen({
   onSubmit,
@@ -54,7 +58,7 @@ export default function ForgotPasswordScreen({
     return () => clearInterval(interval);
   }, []);
 
-  const neutralError = neutralize(error);
+  const visibleError = withoutAccountReveal(error);
 
   const submit = () => {
     if (loading || submitRef.current || cooldown > 0) return;
@@ -105,9 +109,9 @@ export default function ForgotPasswordScreen({
           returnKeyType="send"
         />
         {/* لا نعرض رسالة «لا يوجد حساب» حتى لو أرسلها الخادم: عرضها يحوّل
-            الشاشة إلى أداة تعداد حسابات مجانية. نستبدلها بصياغة محايدة —
-            والإصلاح الجذري في الخادم بأن يردّ ٢٠٠ محايداً دائماً. */}
-        <ErrorBanner message={neutralError} />
+            الشاشة إلى أداة تعداد حسابات مجانية. والإصلاح الجذري في الخادم
+            بأن يردّ ٢٠٠ محايداً دائماً. */}
+        <ErrorBanner message={visibleError} />
       </View>
 
       <View style={styles.flex} />

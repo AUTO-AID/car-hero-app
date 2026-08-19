@@ -27,7 +27,7 @@ import {
   PhoneField,
   PrimaryButton,
 } from "../../components/ui";
-import { colors, font, layout, radius, spacing } from "../../theme/theme";
+import { colors, font, layout, spacing } from "../../theme/theme";
 import { collectErrors, validatePasswordPresent, validatePhone } from "../../services/validators";
 
 export default function LoginScreen({
@@ -105,12 +105,10 @@ export default function LoginScreen({
       >
         <View style={styles.brand}>
           <Image
-            source={require("../../../assets/carhero-app-icon.png")}
+            source={require("../../../assets/carhero-logo.png")}
             style={styles.logo}
-            alt=""
-            aria-hidden
+            accessibilityLabel="Car Hero"
           />
-          <Text style={styles.brandName}>Car Hero</Text>
         </View>
 
         <View style={styles.intro}>
@@ -200,14 +198,14 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     paddingHorizontal: spacing.screenH,
   },
-  brand: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
+  brand: { alignItems: "center" },
+  // الشعار الأفقي يضمّ العلامة والاسم معاً؛ الارتفاع مشتقّ من نسبته الأصلية
+  // فلا ينضغط الاسم ولا تتمدّد العلامة.
+  logo: {
+    width: layout.logoBrand,
+    height: layout.logoBrand / layout.logoAspect,
+    resizeMode: "contain",
   },
-  logo: { width: 64, height: 64, borderRadius: radius.md },
-  brandName: { color: colors.primary, fontSize: font.size.title, fontWeight: "700" },
   intro: { marginTop: spacing.xxl, alignItems: "flex-end" },
   title: { fontSize: font.size.h1, fontWeight: "700", color: colors.textDark, textAlign: "right" },
   subtitle: {

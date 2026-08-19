@@ -26,6 +26,21 @@ export const PERMISSION = {
 // تشغيل GPS لكل شاشة تستنزف البطارية بلا فائدة.
 const DEFAULT_MAX_AGE_MS = 2 * 60 * 1000;
 
+// getCurrentPositionAsync لا يقبل مهلة إطلاقاً (راجع LocationOptions: فيها
+// accuracy وtimeInterval وdistanceInterval فقط)، وهي تنتظر تثبيت إشارة قد
+// لا يأتي أبداً داخل مبنى. بلا سباق زمني تبقى الشاشة معلّقة إلى ما لا نهاية
+// — وهذا كان سبب البطء: لا حدّ أعلى للانتظار ولا بديل عند التأخّر.
+const FRESH_FIX_TIMEOUT_MS = 7000;
+
+// آخر موضع يعرفه النظام يعود خلال أجزاء من الثانية لأنه لا يشغّل الراديو.
+// توثيق expo نفسه يوصي به حين لا تكون الدقّة العالية شرطاً — وهي ليست
+// شرطاً هنا: نريد أقرب فنيّ، لا مسحاً هندسياً.
+const LAST_KNOWN_MAX_AGE_MS = 5 * 60 * 1000;
+
+// عند طلب صريح («موقعي الحالي») لا نقبل موضعاً قديماً إلا إن كان طازجاً
+// جداً — المستخدم ضغط الزر لأنه يريد تحديثاً.
+const FORCED_LAST_KNOWN_MAX_AGE_MS = 30 * 1000;
+
 let cached = null; // { latitude, longitude, accuracy, source: 'device' | 'manual', at }
 let inflight = null; // طلب جارٍ — يمنع تشغيل GPS مرّتين عند فتح شاشتين معاً
 
@@ -37,6 +52,31 @@ function normalize(coords, source) {
     source,
     at: Date.now(),
   };
+}
+
+/** آخر موضع معروف للنظام — يعود فوراً أو لا يعود شيء */
+async function readLastKnown(maxAge) {
+  try {
+    const position = await Location.getLastKnownPositionAsync({ maxAge });
+    return position ? normalize(position.coords, "device") : null;
+  } catch {
+    return null;
+  }
+}
+
+/** سباق زمني: يُرجع null عند انقضاء المهلة بدل أن يعلّق النداء */
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function timeoutError() {
+  const error = new Error("تعذّر تحديد موقعك الآن. تأكّد من تفعيل خدمة الموقع أو حدّد موقعك يدوياً.");
+  error.code = "LOCATION_TIMEOUT";
+  return error;
 }
 
 function deniedError() {
@@ -146,11 +186,29 @@ export async function getCoords({
   if (inflight) return inflight;
   inflight = (async () => {
     try {
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      cached = normalize(position.coords, "device");
-      return cached;
+      // ١) ما يعرفه النظام أصلاً — يعود خلال أجزاء من الثانية ويكفي لإيجاد
+      //    أقرب فنيّ. الطلب الصريح وحده يتجاوزه ما لم يكن طازجاً جداً.
+      const lastKnown = await readLastKnown(
+        force ? FORCED_LAST_KNOWN_MAX_AGE_MS : LAST_KNOWN_MAX_AGE_MS,
+      );
+      if (lastKnown) {
+        cached = lastKnown;
+        if (!force) return cached;
+      }
+
+      // ٢) تثبيت طازج، لكن بسقف زمني: بلا هذا السقف ينتظر النداء بلا نهاية.
+      const position = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        FRESH_FIX_TIMEOUT_MS,
+      );
+      if (position) {
+        cached = normalize(position.coords, "device");
+        return cached;
+      }
+
+      // ٣) انقضت المهلة: موضع قديم بمئات الأمتار خير من دوّارة لا تتوقف.
+      if (cached) return cached;
+      throw timeoutError();
     } finally {
       inflight = null;
     }

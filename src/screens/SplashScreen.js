@@ -78,8 +78,8 @@ export function useBootPhase(pending) {
 }
 
 // وجهة الشعار في الشاشة التالية — تُحسب من نفس رموز theme التي ترسم بها تلك
-// الشاشة رأسها. الإزاحة الأفقية تقريبية (عرض اسم العلامة بجانب الشعار غير
-// معلوم قبل القياس)، وهي غير محسوسة لأن الشعار يبلغ شفافية صفر عند الوصول.
+// الشاشة رأسها. القياسات أعراضٌ لشعار واحد ثابت النسبة، فنسبة التصغير
+// (عرض الوجهة ÷ عرض المصدر) تصف الانتقال كاملاً بلا تشويه.
 function exitTargetFor(destination, { width, insets, source }) {
   if (!source) return { scale: 0.96, dx: 0, dy: 0 };
   const sourceCX = source.x + source.width / 2;
@@ -278,15 +278,11 @@ export default function SplashScreen({
             style={styles.logoTile}
           >
             <Image
-              source={require("../../assets/carhero-app-icon.png")}
+              source={require("../../assets/carhero-logo.png")}
               style={styles.logo}
               accessibilityLabel="شعار Car Hero"
             />
           </LinearGradient>
-        </Animated.View>
-
-        <Animated.View style={{ opacity: exit.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
-          <Text style={styles.brand}>Car Hero</Text>
         </Animated.View>
       </View>
 
@@ -361,17 +357,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     ...shadow.soft,
   },
+  // الشعار يحمل اسم العلامة داخله، فلا سطر «Car Hero» تحته: تكرار الاسم
+  // مرّتين في شاشة واحدة يقرأه العين كخطأ لا كتوكيد.
   logo: {
     width: layout.logoSplash,
-    height: layout.logoSplash,
-    borderRadius: radius.lg,
-  },
-  brand: {
-    marginTop: spacing.lg,
-    fontSize: font.size.title,
-    fontWeight: "700",
-    color: colors.primary,
-    textAlign: "center",
+    height: layout.logoSplash / layout.logoAspect,
+    resizeMode: "contain",
   },
 
   // لوحة الحالة أسفل الهوية: مساحة محجوزة سلفاً فلا يقفز التخطيط عند تبدّل الحالة

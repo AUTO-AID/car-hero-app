@@ -77,6 +77,23 @@ export function PressableScale({
   );
 }
 
+// شريط معتم بارتفاع شريط الحالة، يُرسم **فوق** كل المحتوى في جذر التطبيق.
+//
+// السبب: `edgeToEdgeEnabled` في app.json يجعل التطبيق يرسم خلف شريط الحالة
+// الشفّاف. حشوة `insets.top` في كل شاشة تُنزل المحتوى تحته عند أول عرض، لكنها
+// لا تحكم شيئاً بعد ذلك: ما إن يمرّر المستخدم حتى يصعد النصّ خلف الشريط ويبقى
+// مرئياً هناك، فيتداخل مع الساعة والبطارية (رُصد في شاشة إنشاء الحساب).
+// القصّ وحده لا يكفي لأن ScrollView لا تقصّ خارج حدودها هنا.
+//
+// موضعه في الجذر لا في ScreenContainer: سبع شاشات فقط تستخدم الأخيرة، وخمس
+// وثلاثون تبني ScrollView بنفسها — ونسخ الإصلاح فيها كلها يعني نسيانه في
+// أول شاشة جديدة.
+export function StatusBarScrim() {
+  const insets = useSafeAreaInsets();
+  if (!insets.top) return null;
+  return <View pointerEvents="none" style={[ui.statusBarScrim, { height: insets.top }]} />;
+}
+
 export function ScreenContainer({ children, contentStyle, edgeToEdgeTop = false }) {
   const insets = useSafeAreaInsets();
   return (
@@ -867,6 +884,97 @@ export function AsyncContent({
   );
 }
 
+/**
+ * مؤشّر قوّة كلمة المرور.
+ *
+ * كان كل من شاشتَي «إنشاء حساب» و«إعادة تعيين» يرسم القائمة الخمسية نفسها:
+ * خمسة صفوف مكدّسة، كلٌّ بدائرة ونصّ مشطوب. وحين تُستوفى الشروط كلّها تبقى
+ * على الشاشة خمسة صفوف خضراء لا تحمل أي معلومة جديدة — نحو ١١٠ بكسل من
+ * التأكيد المكرّر في منتصف نموذج التسجيل. وفي شاشة إعادة التعيين كان
+ * الشريط المقسّم يظهر فوق القائمة، فيُقال الشيء ذاته مرّتين.
+ *
+ * المبدأ هنا: أظهر ما ينقص، لا ما اكتمل.
+ * - شريط مقسّم + وصف واحد يحملان الحالة دائماً.
+ * - الشروط الإلزامية تُعرض فقط ما دامت ناقصة، في سطر واحد ملتفّ لا في
+ *   صفوف مكدّسة.
+ * - عند اكتمالها ينهار كل ذلك إلى سطر تأكيد واحد، مع تلميح خفيف للاختياري.
+ *
+ * الحالة لا تُنقَل باللون وحده: هناك أيقونة ونصّ صريح، والملخّص يُعلَن
+ * لقارئ الشاشة عبر منطقة حيّة.
+ */
+export function PasswordStrength({ rules, optionalNote = "يزيد الأمان", style }) {
+  const required = rules.filter((rule) => rule.required);
+  const optional = rules.filter((rule) => !rule.required);
+  const metRequired = required.filter((rule) => rule.met).length;
+  const missingRequired = required.filter((rule) => !rule.met);
+  const missingOptional = optional.filter((rule) => !rule.met);
+  const allRequiredMet = missingRequired.length === 0;
+
+  // الشريط يعدّ الشروط المستوفاة كما هي: أي شرط يُستوفى يضيء خانة. الصيغة
+  // السابقة كانت تعطي «ممتازة» أربع خانات من خمس، فيناقض الشريطُ وصفَه.
+  const optionalMet = optional.length - missingOptional.length;
+  const maxScore = required.length + optional.length;
+  const filled = metRequired + optionalMet;
+
+  let tone = colors.danger;
+  let label = "ضعيفة";
+  if (allRequiredMet && optionalMet >= optional.length) {
+    tone = colors.success;
+    label = "ممتازة";
+  } else if (allRequiredMet && optionalMet > 0) {
+    tone = colors.success;
+    label = "قوية";
+  } else if (allRequiredMet) {
+    tone = colors.warning;
+    label = "مقبولة";
+  } else if (metRequired > 0) {
+    tone = colors.warning;
+    label = "ضعيفة";
+  }
+
+  const summary = allRequiredMet
+    ? `كلمة المرور ${label}. استوفيت الشروط الإلزامية كلها.`
+    : `كلمة المرور ${label}. ينقصها: ${missingRequired.map((rule) => rule.label).join("، ")}.`;
+
+  return (
+    <View
+      style={[ui.pwWrap, style]}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={summary}
+    >
+      <View style={ui.pwMeterRow}>
+        <View style={ui.pwTrack}>
+          {Array.from({ length: maxScore }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                ui.pwSegment,
+                index < filled && { backgroundColor: tone },
+              ]}
+            />
+          ))}
+        </View>
+        <AppText style={[ui.pwLabel, { color: tone }]}>{label}</AppText>
+      </View>
+
+      {allRequiredMet ? (
+        <View style={ui.pwDoneRow}>
+          <Check size={12} weight="bold" color={colors.success} />
+          <AppText style={ui.pwDoneText}>
+            {missingOptional.length
+              ? `مستوفاة — أضف ${missingOptional.map((rule) => rule.label).join(" أو ")} ${optionalNote}`
+              : "مستوفاة لكل الشروط"}
+          </AppText>
+        </View>
+      ) : (
+        <AppText style={ui.pwMissing}>
+          ينقصها: {missingRequired.map((rule) => rule.label).join(" · ")}
+        </AppText>
+      )}
+    </View>
+  );
+}
+
 const ui = StyleSheet.create({
   selectValue: { flex: 1, minWidth: 0, fontSize: font.size.md, color: colors.textHeading, textAlign: "right" },
   selectPlaceholder: { color: colors.textMuted2 },
@@ -980,6 +1088,13 @@ const ui = StyleSheet.create({
   sheetActionCancel: { borderColor: "transparent", backgroundColor: colors.surfaceAlt },
   sheetActionCancelText: { fontSize: font.size.sm, fontWeight: "700", color: colors.textMuted },
 
+  statusBarScrim: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.screenBg,
+  },
   screenFlex: { flex: 1, backgroundColor: colors.screenBg },
   screenContent: {
     flexGrow: 1,
@@ -1126,4 +1241,13 @@ const ui = StyleSheet.create({
   sectionHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
   sectionTitle: { flex: 1, fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "right" },
   sectionAction: { fontSize: font.size.sm },
+
+  pwWrap: { marginTop: spacing.sm, gap: 6 },
+  pwMeterRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
+  pwTrack: { flex: 1, flexDirection: "row-reverse", gap: 4 },
+  pwSegment: { flex: 1, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  pwLabel: { fontSize: font.size.xs, fontWeight: "700", minWidth: 46, textAlign: "left" },
+  pwMissing: { fontSize: font.size.xs, color: colors.textBody, textAlign: "right", lineHeight: 18 },
+  pwDoneRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.xs },
+  pwDoneText: { fontSize: font.size.xs, color: colors.textMuted2, textAlign: "right", flex: 1, lineHeight: 18 },
 });

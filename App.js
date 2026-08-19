@@ -724,7 +724,6 @@ function Root({ fontsReady = true }) {
                 })}
                 onOpenCatalog={() => setStep("services")}
                 onOpenOffers={() => nav.navigate("Offers")}
-                onOpenOrders={() => setStep("orders")}
               />
             )}
 
