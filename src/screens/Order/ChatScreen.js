@@ -30,6 +30,28 @@ function isMine(m, userId) {
   return sender && userId && String(sender) === String(userId);
 }
 function msgText(m) { return m.message || m.text || m.body || ''; }
+// الخادم يبثّ 'new_message' إلى غرفة المحادثة كلها — بما فيها المُرسِل نفسه.
+// وكانت الشاشة تضيف الرسالة تفاؤلياً عند الضغط ثم تضيف صدى الخادم كرسالة
+// ثانية، لأن المطابقة كانت بالمعرّف فقط: المحلية تحمل `local-…` والقادمة
+// تحمل `_id` من قاعدة البيانات، فلا يتطابقان أبداً — فتظهر كل رسالة مرّتين.
+//
+// هنا: صدى رسالتي يحلّ محلّ فقاعتها المحلية، وصدى الآخرين يُضاف كالمعتاد.
+function mergeIncoming(prev, message, myId) {
+  const incomingId = getId(message);
+  // نفس الرسالة من الخادم مرّتين (بعد إعادة اتصال مثلاً)
+  if (incomingId && prev.some((m) => !m.local && getId(m) === incomingId)) return prev;
+
+  if (isMine(message, myId)) {
+    // الأقدم أولاً، ليطابق ترتيب الإرسال حين تتكرّر نفس الكلمة
+    const idx = prev.findIndex((m) => m.local && msgText(m) === msgText(message));
+    if (idx !== -1) {
+      const next = prev.slice();
+      next[idx] = message;
+      return next;
+    }
+  }
+  return [...prev, message];
+}
 function msgTime(m) { return m.createdAt ? new Date(m.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : 'الآن'; }
 function chatTitle(chat, route) {
   if (route?.providerName) return route.providerName;
@@ -55,6 +77,10 @@ export default function ChatScreen({ navigation, route }) {
   const [connected, setConnected] = useState(false);
   const socketRef = useRef(null);
   const scrollRef = useRef(null);
+  // مستمعو الـ socket تُسجَّل مرّة واحدة على [chatId]، فقراءة user من الإغلاق
+  // تُجمّد قيمتها لحظة التسجيل. المرجع يبقيها حديثة.
+  const userIdRef = useRef(user?.id);
+  userIdRef.current = user?.id;
 
   const ensureChat = useCallback(async () => {
     if (chatId) return chatId;
@@ -99,11 +125,8 @@ export default function ChatScreen({ navigation, route }) {
       socket.on('connect_error', () => setConnected(false));
       socket.emit('join_chat', { chatId });
       socket.on('new_message', (message) => {
-        setMessages((prev) => prev.some((m) => getId(m) === getId(message)) ? prev : [...prev, message]);
+        setMessages((prev) => mergeIncoming(prev, message, userIdRef.current));
         setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
-      });
-      socket.on('message_sent', (message) => {
-        setMessages((prev) => prev.some((m) => getId(m) === getId(message)) ? prev : [...prev, message]);
       });
       socket.on('error', (e) => setNotice(e?.message || 'حدث خطأ في الاتصال بالمحادثة'));
     });
@@ -122,10 +145,20 @@ export default function ChatScreen({ navigation, route }) {
       const id = await ensureChat();
       const socket = socketRef.current;
       if (!socket?.connected) throw new Error('لا يوجد اتصال');
-      socket.emit('send_message', { chatId: id, message: body, type: 'text' });
-      setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, pending: false, failed: false, sent: true } : m)));
+      // emit وحده لا يعني الوصول: الحارس أو التحقّق قد يرفض الرسالة على الخادم
+      // فتبقى معروضة كـ«أُرسلت». ack من البوّابة هو التأكيد الحقيقي.
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('انتهت مهلة الإرسال')), 12000);
+        socket.emit('send_message', { chatId: id, message: body, type: 'text' }, (res) => {
+          clearTimeout(timer);
+          if (res && res.success === false) reject(new Error(res.message || 'تعذّر إرسال الرسالة'));
+          else resolve(res);
+        });
+      });
+      // إن سبق صدى الخادم وصولَ الـ ack فالفقاعة المحلية استُبدلت — لا نعيدها
+      setMessages((prev) => prev.map((m) => (m.local && m.id === localId ? { ...m, pending: false, failed: false, sent: true } : m)));
     } catch (e) {
-      setMessages((prev) => prev.map((m) => (m.id === localId ? { ...m, pending: false, failed: true } : m)));
+      setMessages((prev) => prev.map((m) => (m.local && m.id === localId ? { ...m, pending: false, failed: true } : m)));
       setNotice(e?.message === 'لا يوجد اتصال'
         ? 'لا يوجد اتصال — الرسالة محفوظة، أعد إرسالها عند عودة الشبكة'
         : (e?.message || 'تعذّر إرسال الرسالة'));
@@ -137,7 +170,7 @@ export default function ChatScreen({ navigation, route }) {
     if (!t || sending) return;
     setSending(true);
     const localId = `local-${Date.now()}`;
-    setMessages((m) => [...m, { id: localId, senderId: user?.id, message: t, createdAt: new Date().toISOString(), pending: true }]);
+    setMessages((m) => [...m, { id: localId, local: true, senderId: user?.id, message: t, createdAt: new Date().toISOString(), pending: true }]);
     setText('');
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 60);
     await deliver(localId, t);
