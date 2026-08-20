@@ -19,6 +19,7 @@ import { colors, font, layout, radius, spacing } from "../../theme/theme";
 import { cancelOrder, fetchTracking } from "../../services/ordersApi";
 import { canCancel, statusLabel } from "../../services/orderStatus";
 import { createOrdersSocket } from "../../services/realtime";
+import TrackingMap from "../../components/TrackingMap";
 
 const STEPS = [
   { label: "تم استلام الطلب", Icon: Check },
@@ -38,7 +39,18 @@ const STATUS_INDEX = {
   completed: 3,
 };
 
+// نفس مجموعة الحالات التي يسمح فيها الخادم بتحديث الموقع
+// (UpdateProviderLocationUseCase). عرض خريطة حيّة خارجها وعدٌ لا يُوفى.
+const TRACKABLE_STATUSES = new Set([
+  "accepted",
+  "provider_assigned",
+  "provider_en_route",
+  "provider_arrived",
+  "in_progress",
+]);
+
 const arNum = (value) => Number(value).toLocaleString("ar-EG");
+const oneDecimal = (value) => Math.round(Number(value) * 10) / 10;
 const orderIdOf = (value) => value?.id || value?._id || value;
 const providerIdOf = (tracking) => orderIdOf(tracking?.providerId || tracking?.provider?._id || tracking?.provider?.id);
 const providerName = (tracking) => tracking?.provider?.businessName || tracking?.provider?.fullName || "الفني المسؤول";
@@ -63,6 +75,10 @@ export default function OrderTrackingScreen({ navigation, route }) {
   const [live, setLive] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  // معلومات المسار القادمة من الخريطة (مسافة طريق حقيقية عند نجاح التوجيه)
+  const [routeInfo, setRouteInfo] = useState(null);
+  // تنبيه غير قاتل: الشاشة تبقى تعمل لكن التحديث المباشر قد لا يصل
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     if (!orderId) {
@@ -83,6 +99,11 @@ export default function OrderTrackingScreen({ navigation, route }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // أسماء الأحداث يجب أن تطابق ClientEvents/ServerEvents في البوّابة حرفياً.
+  // كانت الشاشة تنضمّ بـ "join_order" وتُصغي إلى "order_location_updated"
+  // بينما البوّابة تستعمل "join:order" و"order:location:updated" — فلم ينضمّ
+  // العميل إلى غرفة الطلب قطّ ولم يصله أي تحديث. التتبّع المباشر لم يكن
+  // يعمل إطلاقاً، وكان يبدو كأنّ الفني لا يتحرّك.
   useEffect(() => {
     if (!orderId) return undefined;
     let mounted = true;
@@ -93,22 +114,55 @@ export default function OrderTrackingScreen({ navigation, route }) {
       }
       socketRef.current = socket;
       setLive(!!socket.connected);
-      socket.on("connect", () => setLive(true));
+
+      // الانضمام محروس بالصلاحية على الخادم؛ فشله بصمت = شاشة لا تتحدّث أبداً.
+      // ويُعاد بعد كل إعادة اتصال وإلا خرجنا من الغرفة دون أن يظهر ذلك.
+      const joinRoom = () => {
+        socket.emit("join:order", { orderId }, (response) => {
+          if (response && response.success === false) {
+            setNotice("تعذّر الاشتراك بتحديثات هذا الطلب مباشرةً");
+          } else {
+            setNotice("");
+          }
+        });
+      };
+
+      socket.on("connect", () => { setLive(true); joinRoom(); });
       socket.on("disconnect", () => setLive(false));
       socket.on("connect_error", () => setLive(false));
-      socket.emit("join_order", { orderId });
-      const merge = (patch) => setTracking((previous) => ({ ...(previous || {}), ...(patch || {}) }));
-      socket.on("order_location_updated", merge);
-      socket.on("order_status_updated", merge);
-      socket.on("provider_location_updated", (payload) => merge({
-        providerLocation: payload?.location || payload?.providerLocation || payload,
-        providerLocationUpdatedAt: payload?.recordedAt || payload?.updatedAt || new Date().toISOString(),
+      if (socket.connected) joinRoom();
+
+      // القيم غير المعرّفة تُتجاهل: دمجها الخام كان يمسح حقولاً موجودة حين
+      // لا يحملها الحدث (مثل status في حدث الموقع).
+      const merge = (patch) => setTracking((previous) => {
+        const next = { ...(previous || {}) };
+        Object.keys(patch || {}).forEach((key) => {
+          if (patch[key] !== undefined) next[key] = patch[key];
+        });
+        return next;
+      });
+
+      socket.on("order:status:updated", (payload) => merge({ status: payload?.status }));
+
+      // شكل الحمولة يختلف عن شكل ردّ /tracking: الموقع تحت location لا
+      // providerLocation، والوقت تحت timestamp. الدمج الخام كان يضع location
+      // في الكائن ويترك providerLocation الذي تقرؤه الشاشة على قيمته القديمة.
+      const applyLocation = (payload) => merge({
+        providerLocation: payload?.location || payload?.providerLocation || null,
+        providerLocationUpdatedAt:
+          payload?.timestamp || payload?.recordedAt || payload?.updatedAt || new Date().toISOString(),
+        providerHeading: typeof payload?.heading === "number" ? payload.heading : undefined,
+        // السرعة اللحظية في الحدث (م/ث) لا تُستعمل في تقدير الوصول: قراءة
+        // واحدة عند إشارة مرور تُنزل التقدير إلى الصفر ثم تُقفز به. الخادم
+        // يحسب سرعة ممزوجة من المسار، وهي التي نعتمدها — تُجدَّد أدناه.
         isLive: true,
-      }));
+      });
+      socket.on("order:location:updated", applyLocation);
+      socket.on("provider:location:updated", applyLocation);
     }).catch(() => {});
     return () => {
       mounted = false;
-      socketRef.current?.emit?.("leave_order", { orderId });
+      socketRef.current?.emit?.("leave:order", { orderId });
       socketRef.current?.disconnect?.();
       socketRef.current = null;
     };
@@ -118,14 +172,79 @@ export default function OrderTrackingScreen({ navigation, route }) {
   const currentStep = STATUS_INDEX[status] ?? 0;
   const providerId = providerIdOf(tracking);
   const phone = providerPhone(tracking);
+  const trackable = TRACKABLE_STATUSES.has(status);
+
+  // قِدَم الإشارة يتغيّر بمرور الوقت لا بوصول بيانات جديدة؛ بلا نبضة دورية
+  // يبقى «آخر تحديث» يبدو حديثاً إلى الأبد بعد انقطاع الفني.
+  const [nowTs, setNowTs] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTs(Date.now()), 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const updatedAtMs = tracking?.providerLocationUpdatedAt
+    ? new Date(tracking.providerLocationUpdatedAt).getTime()
+    : null;
+  const stale = !updatedAtMs || nowTs - updatedAtMs > 120000;
+
+  // الموقع يصل لحظياً عبر الـ socket، أمّا السرعة الممزوجة والمسافة فتُحسبان
+  // على الخادم من سجلّ المسار ولا تُبَثّان. بلا تجديد دوري يبقى تقدير الوصول
+  // مبنياً على سرعة لحظة فتح الشاشة طوال الرحلة.
+  useEffect(() => {
+    if (!orderId || !trackable) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await fetchTracking(orderId);
+        setTracking((previous) => ({
+          ...(previous || {}),
+          // الموقع الأحدث يأتي من الـ socket؛ لا نتراجع عنه إلى قراءة الخادم
+          speedKmH: fresh?.speedKmH,
+          etaMinutes: fresh?.etaMinutes,
+          distanceKm: fresh?.distanceKm,
+          etaBasis: fresh?.etaBasis,
+          status: fresh?.status ?? previous?.status,
+        }));
+      } catch {
+        // فشل التجديد لا يُفسد الشاشة: القيم السابقة تبقى معروضة
+      }
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [orderId, trackable]);
+
+  // الخريطة تقرأ الاتجاه من كائن الموقع نفسه
+  const providerPoint = useMemo(() => {
+    const location = tracking?.providerLocation;
+    if (!location || !Array.isArray(location.coordinates)) return null;
+    return {
+      coordinates: location.coordinates,
+      heading: typeof tracking?.providerHeading === "number" ? tracking.providerHeading : undefined,
+    };
+  }, [tracking?.providerLocation, tracking?.providerHeading]);
+
+  // الخادم يقدّر المسافة هوائياً × معامل التفاف. فإن نجح توجيه الطرق في
+  // الخريطة صارت لدينا مسافة طريق حقيقية وهي أدقّ — لكن الزمن يُحسب
+  // بالسرعة المرصودة للفني لا بسرعة OSRM النظرية، لأن الأولى تعكس الازدحام.
+  const distanceKm = routeInfo?.source === "osrm" && routeInfo.distanceKm != null
+    ? routeInfo.distanceKm
+    : tracking?.distanceKm;
+
+  const etaMinutes = useMemo(() => {
+    const speed = tracking?.speedKmH;
+    if (routeInfo?.source === "osrm" && routeInfo.distanceKm != null && speed > 0) {
+      return Math.max(1, Math.ceil((routeInfo.distanceKm / speed) * 60) + 1);
+    }
+    if (routeInfo?.durationMin != null) return Math.max(1, Math.ceil(routeInfo.durationMin));
+    return tracking?.etaMinutes ?? null;
+  }, [routeInfo, tracking?.speedKmH, tracking?.etaMinutes]);
+
   const etaLabel = useMemo(() => {
-    if (tracking?.etaMinutes != null) return `الوصول المتوقع خلال ${arNum(tracking.etaMinutes)} دقيقة`;
     if (status === "provider_arrived") return "وصل الفني إلى موقعك";
     if (status === "in_progress") return "الخدمة قيد التنفيذ";
     if (status === "awaiting_customer_confirmation") return "بانتظار تأكيد إتمام الخدمة";
     if (status === "completed") return "تم إكمال الخدمة";
+    if (etaMinutes != null) return `الوصول المتوقع خلال ${arNum(etaMinutes)} دقيقة`;
     return "سيظهر وقت الوصول عند تحديث موقع الفني";
-  }, [status, tracking?.etaMinutes]);
+  }, [status, etaMinutes]);
 
   // الإلغاء عبر ConfirmSheet لا Alert.alert: الأخير لا يعمل على الويب،
   // فكان زر الإلغاء يبدو مستجيباً ولا يفعل شيئاً إطلاقاً.
@@ -177,13 +296,33 @@ export default function OrderTrackingScreen({ navigation, route }) {
                 <Text style={styles.statusName}>{statusLabel(tracking?.status)}</Text>
                 <Text style={styles.eta}>{etaLabel}</Text>
                 <Text style={styles.updated}>{formatUpdatedAt(tracking?.providerLocationUpdatedAt)}</Text>
+                {notice ? (
+                  <Text style={styles.notice} accessibilityLiveRegion="polite">{notice}</Text>
+                ) : null}
               </View>
             </View>
 
+            {/* الخريطة في حالات التتبّع فقط: خريطة ساكنة بعد انتهاء الخدمة
+                توحي بتتبّع لم يعد قائماً. */}
+            {trackable ? (
+              <View style={styles.mapBlock}>
+                <TrackingMap
+                  provider={providerPoint}
+                  destination={tracking?.destination}
+                  traveled={tracking?.route}
+                  updatedAt={tracking?.providerLocationUpdatedAt}
+                  active={trackable}
+                  stale={stale}
+                  height={300}
+                  onRouteInfo={setRouteInfo}
+                />
+              </View>
+            ) : null}
+
             <View style={styles.metrics}>
-              <Metric Icon={MapPin} label="المسافة" value={tracking?.distanceKm != null ? `${arNum(tracking.distanceKm)} كم` : "غير متاحة"} />
+              <Metric Icon={MapPin} label="المسافة" value={distanceKm != null ? `${arNum(oneDecimal(distanceKm))} كم` : "غير متاحة"} />
               <View style={styles.metricDivider} />
-              <Metric Icon={Clock} label="الوقت المتوقع" value={tracking?.etaMinutes != null ? `${arNum(tracking.etaMinutes)} دقيقة` : "غير متاح"} />
+              <Metric Icon={Clock} label="الوقت المتوقع" value={etaMinutes != null ? `${arNum(etaMinutes)} دقيقة` : "غير متاح"} />
             </View>
 
             <Text style={styles.sectionTitle}>حالة الطلب</Text>
@@ -305,6 +444,8 @@ const styles = StyleSheet.create({
   statusName: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "right", marginTop: 2 },
   eta: { marginTop: spacing.xs, color: colors.textDark, fontSize: font.size.body, fontWeight: "700", textAlign: "right" },
   updated: { marginTop: 2, color: colors.textMuted, fontSize: font.size.xxs, textAlign: "right" },
+  notice: { marginTop: 4, color: colors.warning, fontSize: font.size.xxs, textAlign: "right" },
+  mapBlock: { marginTop: spacing.sm },
   metrics: { minHeight: 84, flexDirection: "row-reverse", alignItems: "center", backgroundColor: colors.secondarySoft, borderRadius: radius.card, marginTop: spacing.sm, paddingVertical: spacing.md },
   metric: { flex: 1, minWidth: 0, alignItems: "center", gap: 2 },
   metricDivider: { width: 1, height: 44, backgroundColor: "#CBE3E0" },
