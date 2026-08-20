@@ -31,7 +31,7 @@
       "@react-native-community/datetimepicker"
     ],
     "extra": {
-      "apiBaseUrl": null,
+      "apiBaseUrl": "https://car-hero-backend.onrender.com",
       "tileUrlTemplate": null
     }
   }
