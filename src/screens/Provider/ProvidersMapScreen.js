@@ -93,7 +93,7 @@ export default function ProvidersMapScreen({ navigation }) {
         {(viewMode === 'map' ? shown.slice(0, PIN_POS.length) : []).map((p, i) => {
           const on = p.id === selected?.id;
           return (
-            <Pressable accessibilityRole="button" accessibilityLabel={`اختيار الفني ${p.businessName || p.fullName || i + 1}`} accessibilityState={{ selected: on }} key={p.id} onPress={() => setSelectedId(p.id)} style={[s.provPin, PIN_POS[i], on && s.provPinOn]}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`عرض بيانات الفني ${p.businessName || p.fullName || i + 1}`} accessibilityState={{ selected: on }} key={p.id} onPress={() => setSelectedId(p.id)} style={[s.provPin, PIN_POS[i], on && s.provPinOn]}>
               <Wrench size={15} weight="fill" color="#fff" style={{ transform: [{ rotate: '-45deg' }] }} />
             </Pressable>
           );
@@ -294,14 +294,16 @@ export default function ProvidersMapScreen({ navigation }) {
               <Text style={[s.availText, !isProviderOnline(selected) && { color: colors.textMuted }]}>{isProviderOnline(selected) ? 'متاح' : (selected.status === 'busy' ? 'مشغول' : 'غير متصل')}</Text>
             </View>
           </Pressable>
+          {/* الخريطة تُظهر التغطية ولا تُنشئ طلباً موجَّهاً: الإسناد آليّ
+              إلى أقرب فني متاح، لا إلى من ضغط المستخدم على دبّوسه. */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`طلب خدمة من ${selected.businessName || 'هذا الفني'}`}
-            onPress={() => navigation?.navigate?.('Services', { providerId: selected.id })}
+            accessibilityLabel="طلب خدمة"
+            onPress={() => navigation?.navigate?.('Services', { pushed: true })}
             style={({ pressed }) => pressed && { transform: [{ scale: 0.97 }] }}
           >
             <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.cta, shadow.button]}>
-              <Text style={s.ctaText}>طلب خدمة من هذا الفني</Text>
+              <Text style={s.ctaText}>طلب خدمة</Text>
             </LinearGradient>
           </Pressable>
         </View>

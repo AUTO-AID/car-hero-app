@@ -23,7 +23,7 @@ const formatDate = (date) => date.toLocaleString("ar-EG", { day: "numeric", mont
 
 export default function ConfirmOrderScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const { serviceId, serviceName, servicePrice, providerId, coords: coordsParam } = route?.params || {};
+  const { serviceId, serviceName, servicePrice, coords: coordsParam } = route?.params || {};
   const [scheduled, setScheduled] = useState(false);
   const [when, setWhen] = useState(new Date(Date.now() + 60 * 60 * 1000));
   const [showPicker, setShowPicker] = useState(false);
@@ -106,7 +106,6 @@ export default function ConfirmOrderScreen({ navigation, route }) {
     navigation?.navigate?.("SearchingProvider", {
       serviceId,
       serviceName,
-      providerId: providerId || undefined,
       vehicleId: vehicleId || undefined,
       notes: composedNotes || undefined,
       scheduleTime: scheduled ? when.toISOString() : undefined,

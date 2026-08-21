@@ -230,9 +230,11 @@ export default function ProviderProfileScreen({ navigation, route }) {
       {/* إجراء أساسي واحد ثابت أسفل الشاشة: كان يختفي مع التمرير أسفل قائمة
           مراجعات قد تطول، فيضيع المخرج الوحيد من شاشة الثقة. */}
       <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+        {/* لا يوجد «اطلب من هذا الفني»: الإسناد آليّ ولا يختار المستخدم
+            فنّياً بعينه. الزرّ يقود إلى الخدمات، والخادم يتكفّل بالباقي. */}
         <PrimaryButton
-          label="اطلب من هذا الفني"
-          onPress={() => navigation?.navigate?.('Services', { providerId })}
+          label="اطلب خدمة"
+          onPress={() => navigation?.navigate?.('Services', { pushed: true })}
         />
       </View>
     </View>

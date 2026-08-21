@@ -15,12 +15,10 @@ const formatDistance = (value) => (value == null ? "" : `${Number(value).toLocal
 export default function ServiceDetailScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const serviceId = route?.params?.serviceId;
-  const presetProviderId = route?.params?.providerId || null;
   const presetService = route?.params?.service || null;
   const [service, setService] = useState(presetService);
   const [coords, setCoords] = useState(null);
   const [providers, setProviders] = useState([]);
-  const [selected, setSelected] = useState(presetProviderId);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [providerError, setProviderError] = useState("");
@@ -40,10 +38,7 @@ export default function ServiceDetailScreen({ navigation, route }) {
         category,
         limit: 20,
       });
-      const arr = Array.isArray(list) ? list : [];
-      setProviders(arr);
-      // لا نُبقي اختياراً لفني لم يعد موجوداً أو لم يعد متاحاً
-      setSelected((prev) => (prev && arr.some((p) => (p.id || p._id) === prev && isProviderOnline(p)) ? prev : null));
+      setProviders(Array.isArray(list) ? list : []);
     } catch (nearbyError) {
       setProviders([]);
       setProviderError(nearbyError?.message || "تعذر تحميل الفنيين القريبين");
@@ -103,7 +98,6 @@ export default function ServiceDetailScreen({ navigation, route }) {
       serviceId,
       serviceName: title,
       servicePrice: price,
-      providerId: selected || undefined,
       coords,
     });
   };
@@ -167,10 +161,14 @@ export default function ServiceDetailScreen({ navigation, route }) {
               </View>
             </View>
 
+            {/* عرضٌ لا اختيار: الإسناد آليّ بالكامل. القائمة هنا لتطمئن
+                المستخدم إلى وجود تغطية قريبة، ومنها يُحسب زمن الوصول أعلاه. */}
             <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>اختر فنياً قريباً</Text>
-                <Text style={styles.sectionSubtitle}>يمكنك تخطي الاختيار ليتم الإسناد تلقائياً.</Text>
+              <View style={styles.sectionHeaderCopy}>
+                <Text style={styles.sectionTitle}>الفنيون القريبون منك</Text>
+                <Text style={styles.sectionSubtitle}>
+                  يُسنَد الطلب تلقائياً إلى أقرب فني متاح، ثم إلى الذي يليه إن لم يستجب.
+                </Text>
               </View>
               {onlineCount > 0 ? <Text style={styles.availableCount}>{formatNumber(onlineCount)} متاح</Text> : null}
             </View>
@@ -183,7 +181,7 @@ export default function ServiceDetailScreen({ navigation, route }) {
             ) : providerError ? (
               <View style={styles.notice}>
                 <MapPin size={20} weight="fill" color={colors.warning} />
-                <Text style={styles.noticeText}>{providerError}، وسيتم إسناد الطلب تلقائياً.</Text>
+                <Text style={styles.noticeText}>{providerError}. لا يؤثّر ذلك على طلبك — الإسناد يتم على الخادم.</Text>
                 {/* إعادة محاولة للقائمة وحدها بدل إعادة تحميل الشاشة بالكامل */}
                 <PressableScale
                   accessibilityRole="button"
@@ -197,22 +195,13 @@ export default function ServiceDetailScreen({ navigation, route }) {
             ) : providers.length === 0 ? (
               <View style={styles.notice}>
                 <UserFocus size={20} weight="fill" color={colors.secondary} />
-                <Text style={styles.noticeText}>لا يوجد فنيون قريبون ظاهرون الآن. سيبحث النظام عن مزود عند تأكيد الطلب.</Text>
+                <Text style={styles.noticeText}>لا يوجد فنيون قريبون ظاهرون الآن. سيبحث النظام عن فني متاح عند تأكيد الطلب.</Text>
               </View>
             ) : (
-              <View style={styles.providers} accessibilityRole="radiogroup">
-                {sortedProviders.map((provider) => {
-                  const id = provider.id || provider._id;
-                  const isSelected = id === selected;
-                  return (
-                    <ProviderRow
-                      key={id}
-                      provider={provider}
-                      selected={isSelected}
-                      onPress={() => setSelected(isSelected ? null : id)}
-                    />
-                  );
-                })}
+              <View style={styles.providers} accessibilityRole="list">
+                {sortedProviders.map((provider) => (
+                  <ProviderRow key={provider.id || provider._id} provider={provider} />
+                ))}
               </View>
             )}
           </>
@@ -229,11 +218,7 @@ export default function ServiceDetailScreen({ navigation, route }) {
               {price ? `${formatNumber(price)} ل.س` : "حسب الحالة"}
             </Text>
           </View>
-          <PrimaryButton
-            label={selected ? "المتابعة مع الفني المختار" : "متابعة الطلب"}
-            onPress={proceed}
-            style={styles.footerBtn}
-          />
+          <PrimaryButton label="متابعة الطلب" onPress={proceed} style={styles.footerBtn} />
         </View>
       ) : null}
     </View>
@@ -264,15 +249,12 @@ function Metric({ label, value }) {
   );
 }
 
-function ProviderRow({ provider, selected, onPress }) {
+function ProviderRow({ provider }) {
   const online = isProviderOnline(provider);
   return (
-    <PressableScale
-      style={[styles.provider, !online && styles.providerUnavailable, selected && styles.providerSelected]}
-      onPress={online ? onPress : undefined}
-      disabled={!online}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: selected, disabled: !online }}
+    <View
+      style={[styles.provider, !online && styles.providerUnavailable]}
+      accessibilityRole="text"
       accessibilityLabel={`${provider.businessName || "فني"}، ${online ? "متاح" : "غير متاح"}`}
     >
       <View style={styles.avatar}><Text style={styles.initials}>{providerInitials(provider)}</Text></View>
@@ -291,8 +273,7 @@ function ProviderRow({ provider, selected, onPress }) {
         </View>
         {provider.distance != null ? <Text style={styles.distance}>{formatDistance(provider.distance)}</Text> : null}
       </View>
-      <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <Check size={13} weight="bold" color={colors.onPrimary} /> : null}</View>
-    </PressableScale>
+    </View>
   );
 }
 
@@ -335,6 +316,7 @@ const styles = StyleSheet.create({
   metricLabel: { fontSize: font.size.xxs, color: colors.textMuted, textAlign: "center" },
   metricValue: { marginTop: 2, fontSize: font.size.sm, fontWeight: "700", color: colors.textDark, textAlign: "center" },
   sectionHeader: { flexDirection: "row-reverse", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.md },
+  sectionHeaderCopy: { flex: 1, minWidth: 0 },
   sectionTitle: { fontSize: font.size.body, fontWeight: "700", color: colors.textDark, textAlign: "right" },
   sectionSubtitle: { fontSize: font.size.xxs, color: colors.textMuted, marginTop: 1, textAlign: "right" },
   availableCount: { minHeight: 28, color: colors.success, backgroundColor: colors.successBg, borderRadius: radius.pill, paddingHorizontal: 9, lineHeight: 28, fontSize: font.size.xxs, fontWeight: "700" },
@@ -344,7 +326,6 @@ const styles = StyleSheet.create({
   noticeRetryText: { fontSize: font.size.xs, fontWeight: "700", color: colors.primary },
   providers: { gap: spacing.sm },
   provider: { minHeight: 78, flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderCard, borderRadius: radius.card, padding: spacing.md },
-  providerSelected: { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: "#FCFAFD" },
   providerUnavailable: { opacity: 0.58 },
   avatar: { width: 44, height: 44, flexShrink: 0, borderRadius: radius.sm, backgroundColor: colors.tint, alignItems: "center", justifyContent: "center" },
   initials: { fontSize: font.size.sm, fontWeight: "700", color: colors.primary },
@@ -358,7 +339,5 @@ const styles = StyleSheet.create({
   availabilityDot: { width: 6, height: 6, borderRadius: 3 },
   availabilityText: { fontSize: font.size.xxs, fontWeight: "700" },
   distance: { marginTop: 2, fontSize: font.size.xxs, color: colors.textMuted, writingDirection: "ltr" },
-  radio: { width: 22, height: 22, flexShrink: 0, borderRadius: 11, borderWidth: 1.5, borderColor: colors.borderInput, alignItems: "center", justifyContent: "center" },
-  radioSelected: { borderColor: colors.primary, backgroundColor: colors.primary },
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface, paddingHorizontal: spacing.screenH, paddingTop: spacing.md },
 });

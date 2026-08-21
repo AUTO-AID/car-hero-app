@@ -63,7 +63,6 @@ export default function SearchingProviderScreen({ navigation, route }) {
         longitude: params.longitude,
         latitude: params.latitude,
         vehicleId: params.vehicleId,
-        providerId: params.providerId,
         scheduleTime: params.scheduleTime,
         notes: params.notes,
       });
@@ -80,7 +79,7 @@ export default function SearchingProviderScreen({ navigation, route }) {
         setPhase("error");
       }
     }
-  }, [navigation, params.latitude, params.longitude, params.notes, params.providerId, params.scheduleTime, params.serviceId, params.vehicleId, scheduled]);
+  }, [navigation, params.latitude, params.longitude, params.notes, params.scheduleTime, params.serviceId, params.vehicleId, scheduled]);
 
   useEffect(() => {
     mountedRef.current = true;

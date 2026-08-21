@@ -15,13 +15,11 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  CalendarBlank,
   CalendarCheck,
   CaretLeft,
   CaretRight,
   Clock,
   Info,
-  Storefront,
   WarningCircle,
 } from "phosphor-react-native";
 import {
@@ -37,19 +35,15 @@ import {
 } from "../../components/ui";
 import { colors, font, layout, radius, spacing } from "../../theme/theme";
 import { fetchService, serviceName as serviceNameOf, servicePrice } from "../../services/servicesApi";
-import { fetchProvider } from "../../services/providersApi";
 import { buildOrderBody, createBooking, fetchBookings, isNoProviderError, isSlotConflictError } from "../../services/ordersApi";
 import { ACTIVE_STATUSES } from "../../services/orderStatus";
 import { getCoords } from "../../services/locationService";
-import { qaIs, qaParams } from "../../services/qa";
+import { qaParams } from "../../services/qa";
 import {
   buildDays,
   buildSlots,
   formatDuration,
-  hasPublishedHours,
-  hoursForDay,
   nextFreeSlot,
-  openDaysSummary,
 } from "../../services/scheduling";
 
 const DAYS_AHEAD = 14;
@@ -59,8 +53,8 @@ const arNum = (value) => Number(value || 0).toLocaleString("ar-EG");
 export default function BookingScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   // qaParams تُرجع {} خارج التطوير — تسمح بفحص الشاشة عبر ?qa=bookingNew
-  const params = { ...qaParams(["serviceId", "providerId"]), ...(route?.params || {}) };
-  const { serviceId, providerId } = params;
+  const params = { ...qaParams(["serviceId"]), ...(route?.params || {}) };
+  const { serviceId } = params;
 
   // إحداثيات الطلب تصل مع المعطيات من مسار الطلب؛ وإن غابت نستهلك المخزَّن
   // دون أن نسأل النظام — شاشة التمهيد وحدها تملك حقّ إظهار حوار الإذن.
@@ -73,7 +67,6 @@ export default function BookingScreen({ navigation, route }) {
   );
 
   const [service, setService] = useState(null);
-  const [provider, setProvider] = useState(null);
   const [busy, setBusy] = useState([]);
   const [coords, setCoords] = useState(paramCoords);
   const [loading, setLoading] = useState(true);
@@ -99,15 +92,13 @@ export default function BookingScreen({ navigation, route }) {
     setLoading(true);
     setError("");
     try {
-      const [serviceDoc, providerDoc, bookingsResult, currentCoords] = await Promise.all([
+      const [serviceDoc, bookingsResult, currentCoords] = await Promise.all([
         serviceId ? fetchService(serviceId) : Promise.resolve(null),
-        providerId ? fetchProvider(providerId) : Promise.resolve(null),
         // حجوزات المستخدم نفسه: تعارضها معروف لنا مسبقاً فلا داعي لاكتشافه بالرفض
         fetchBookings({ statuses: ACTIVE_STATUSES.join(","), limit: 50 }).catch(() => ({ bookings: [] })),
         paramCoords ? Promise.resolve(paramCoords) : getCoords().catch(() => null),
       ]);
       setService(serviceDoc);
-      setProvider(providerDoc);
       setBusy(
         (bookingsResult?.bookings || [])
           .filter((booking) => booking?.scheduledAt)
@@ -122,7 +113,7 @@ export default function BookingScreen({ navigation, route }) {
     } finally {
       setLoading(false);
     }
-  }, [serviceId, providerId, paramCoords]);
+  }, [serviceId, paramCoords]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -130,19 +121,12 @@ export default function BookingScreen({ navigation, route }) {
   const days = useMemo(() => buildDays({ now, count: DAYS_AHEAD }), [now]);
   const day = useMemo(() => days.find((item) => item.key === dayKey) || days[0], [days, dayKey]);
 
-  // مزوّد بلا ساعات عمل منشورة = رفض مؤكّد من الخادم لكل موعد. عرض تقويم
-  // كامل فوقه خداع بصري، فنفصل هذه الحالة إلى مسار خاص بمخارج حقيقية.
-  const providerWithoutHours = !!providerId && !!provider && !hasPublishedHours(provider);
-  const assumed = !providerId || qaIs("assumed");
-
-  const dayHours = useMemo(
-    () => (provider ? hoursForDay(provider.workingHours, day?.weekdayEn) : null),
-    [provider, day],
-  );
-
+  // لا مركز مختاراً: الحجز لا يوجَّه إلى فنّي بعينه، فالنافذة الزمنية عامّة
+  // والتوفّر يُحسم على الخادم لحظة الحجز. لذلك كل فتحة هنا **تقديرية**، وهذا
+  // معلن صراحة أدناه بدل ادّعاء يقين لا نملكه.
   const { slots, closed } = useMemo(
-    () => buildSlots({ day, hours: providerId ? dayHours : null, duration, now, busy, assumed }),
-    [day, dayHours, providerId, duration, now, busy, assumed],
+    () => buildSlots({ day, hours: null, duration, now, busy, assumed: true }),
+    [day, duration, now, busy],
   );
 
   const slot = slots.find((item) => item.key === slotKey) || null;
@@ -173,7 +157,6 @@ export default function BookingScreen({ navigation, route }) {
         longitude: coords.longitude,
         latitude: coords.latitude,
         vehicleId: params.vehicleId,
-        providerId,
         scheduleTime: slot.startsAt.toISOString(),
         notes: params.notes,
       });
@@ -234,16 +217,7 @@ export default function BookingScreen({ navigation, route }) {
             </View>
           }
         >
-          {providerWithoutHours ? (
-            <EmptyState
-              icon={<CalendarBlank size={32} color={colors.textMuted2} />}
-              title="هذا المركز لا ينشر ساعات عمله"
-              message="الحجز المسبق لديه غير متاح لأن مواعيده غير معلنة. يمكنك طلب الخدمة الآن، أو الحجز دون تحديد مركز فنترك النظام يختار الأقرب المتاح."
-              actionLabel="احجز دون تحديد مركز"
-              onAction={() => navigation?.navigate?.("Booking", { ...params, providerId: undefined })}
-            />
-          ) : (
-            <>
+          <>
               {/* الخدمة والمدّة: النافذة الزمنية لا نقطة البداية — من يحجز
                   الساعة ١١ يحتاج أن يعرف متى يتحرّر، لا متى يبدأ فقط. */}
               <View style={styles.card}>
@@ -259,32 +233,14 @@ export default function BookingScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {provider ? (
-                <View style={styles.card}>
-                  <View style={styles.cardHead}>
-                    <View style={styles.cardIcon}><Storefront size={21} weight="fill" color={colors.primary} /></View>
-                    <View style={styles.cardCopy}>
-                      <Text style={styles.cardTitle}>{provider.businessName || "المركز المختار"}</Text>
-                      <Text style={styles.cardSub}>
-                        {openDaysSummary(provider.workingHours).length
-                          ? `يعمل ${arNum(openDaysSummary(provider.workingHours).length)} أيام في الأسبوع`
-                          : "ساعات العمل غير معلنة"}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ) : null}
-
               {/* إفصاح صريح عن حدود ما نعرفه: ادّعاء يقين لا نملكه يُنتج وعداً
                   يُخلَف عند التأكيد، وهو أسوأ من الاعتراف المسبق. */}
-              {assumed ? (
-                <View style={styles.note} accessibilityRole="alert">
-                  <Info size={17} weight="fill" color={colors.info} />
-                  <Text style={styles.noteText}>
-                    المواعيد المعروضة تقديرية — يُختار المركز الأقرب المتاح ويُؤكَّد التوفّر لحظة الحجز.
-                  </Text>
-                </View>
-              ) : null}
+              <View style={styles.note} accessibilityRole="alert">
+                <Info size={17} weight="fill" color={colors.info} />
+                <Text style={styles.noteText}>
+                  المواعيد المعروضة تقديرية — يُسنَد الحجز تلقائياً إلى أقرب فني متاح ويُؤكَّد التوفّر لحظة الحجز.
+                </Text>
+              </View>
 
               {/* الأيام: شبكة لا شريط أفقي — الشريط الأفقي لا يُسحب بالفأرة
                   على الويب، فتبقى أيامه الأخيرة غير قابلة للوصول أصلاً. */}
@@ -317,22 +273,18 @@ export default function BookingScreen({ navigation, route }) {
               <View style={styles.dayGrid}>
                 {pageDays.map((item) => {
                   const active = item.key === day?.key;
-                  const dayClosed = !!providerId && hoursForDay(provider?.workingHours, item.weekdayEn)?.isClosed;
                   return (
                     <PressableScale
                       key={item.key}
                       accessibilityRole="button"
-                      accessibilityLabel={`${item.fullLabel}${dayClosed ? "، مغلق" : ""}`}
-                      accessibilityState={{ selected: active, disabled: !!dayClosed }}
-                      disabled={!!dayClosed}
+                      accessibilityLabel={item.fullLabel}
+                      accessibilityState={{ selected: active }}
                       onPress={() => { setDayKey(item.key); setSlotKey(null); }}
-                      style={[styles.dayCell, active && styles.dayCellActive, dayClosed && styles.cellDisabled]}
+                      style={[styles.dayCell, active && styles.dayCellActive]}
                     >
                       <Text style={[styles.dayName, active && styles.dayNameActive]} numberOfLines={1}>{item.dayLabel}</Text>
                       <Text style={[styles.dayNumber, active && styles.dayNumberActive]}>{item.numberLabel}</Text>
-                      <Text style={[styles.dayMonth, active && styles.dayNameActive]} numberOfLines={1}>
-                        {dayClosed ? "مغلق" : item.monthLabel}
-                      </Text>
+                      <Text style={[styles.dayMonth, active && styles.dayNameActive]} numberOfLines={1}>{item.monthLabel}</Text>
                     </PressableScale>
                   );
                 })}
@@ -392,7 +344,7 @@ export default function BookingScreen({ navigation, route }) {
                   <SummaryRow label="الوقت" value={`${slot.label} — ${slot.endLabel}`} />
                   <SummaryRow label="المدّة" value={formatDuration(duration)} />
                   <SummaryRow label="الخدمة" value={serviceNameOf(service) || params.serviceName || "—"} />
-                  <SummaryRow label="المركز" value={provider?.businessName || "الأقرب المتاح"} />
+                  <SummaryRow label="الفني" value="يُسنَد تلقائياً — الأقرب المتاح" />
                   <SummaryRow
                     label="السعر التقديري"
                     value={servicePrice(service) ? `${arNum(servicePrice(service))} ل.س` : "يُحدَّد بعد المعاينة"}
@@ -428,12 +380,11 @@ export default function BookingScreen({ navigation, route }) {
                   style={styles.suggestion}
                 />
               ) : null}
-            </>
-          )}
+          </>
         </AsyncContent>
       </ScrollView>
 
-      {!loading && !error && !providerWithoutHours ? (
+      {!loading && !error ? (
         <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.lg }]}>
           <PrimaryButton
             label={slot ? `تأكيد الحجز · ${slot.label}` : "اختر موعداً أولاً"}
@@ -463,7 +414,7 @@ export default function BookingScreen({ navigation, route }) {
         title="تأكيد الحجز"
         message={
           slot
-            ? `${day.fullLabel} · ${slot.label} حتى ${slot.endLabel}\n${serviceNameOf(service) || params.serviceName || ""}${provider?.businessName ? ` — ${provider.businessName}` : ""}`
+            ? `${day.fullLabel} · ${slot.label} حتى ${slot.endLabel}\n${serviceNameOf(service) || params.serviceName || ""}`
             : ""
         }
         confirmLabel="نعم، احجز"

@@ -135,7 +135,7 @@ export const TRANSLATIONS = {
     periodicWash: "غسل السيارة الدوري",
     periodicWashDesc: "اختر خطة لغسل سيارتك بشكل منتظم.",
     upgradePremium: "ترقية إلى Premium",
-    upgradePremiumDesc: "مزايا إضافية مثل أولوية في الطلبات واختيار الفني الأعلى تقييماً.",
+    upgradePremiumDesc: "مزايا إضافية مثل أولوية في الطلبات وأفضلية الفنيين الأعلى تقييماً.",
     myAddresses: "عناويني",
     myAddressesDesc: "إدارة عناوين المنزل والعمل لاستخدامها في الطلبات.",
     paymentMethods: "طرق الدفع",

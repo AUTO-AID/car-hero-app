@@ -1,6 +1,6 @@
 // ============================================================
 //  ordersApi — الطلبات والحجوزات والتتبّع (Auth)
-//  المعرّف id نصّي. الإسناد تلقائي إن لم يُرسل providerId.
+//  المعرّف id نصّي. الإسناد تلقائي دائماً — لا يختار المستخدم فنّياً.
 // ============================================================
 
 import { api } from './api';
@@ -9,21 +9,23 @@ const NO_PROVIDER_EN = 'No available provider found';
 
 /**
  * بناء جسم الطلب المطابق للباك:
- * { serviceId, location:{coordinates:[lng,lat]}, vehicleId?, providerId?, scheduleTime?, notes? }
+ * { serviceId, location:{coordinates:[lng,lat]}, vehicleId?, scheduleTime?, notes? }
+ *
+ * لا يوجد `providerId`: الخادم وحده يختار الفنّي ثم يعرض الطلب واحداً
+ * بعد آخر حتّى يُقبَل، والحقل محذوف من الـ DTO في الباك أصلاً.
  */
-export function buildOrderBody({ serviceId, longitude, latitude, vehicleId, providerId, scheduleTime, notes }) {
+export function buildOrderBody({ serviceId, longitude, latitude, vehicleId, scheduleTime, notes }) {
   const body = {
     serviceId,
     location: { coordinates: [longitude, latitude] },
   };
   if (vehicleId) body.vehicleId = vehicleId;
-  if (providerId) body.providerId = providerId;
   if (scheduleTime) body.scheduleTime = scheduleTime;
   if (notes) body.notes = notes;
   return body;
 }
 
-/** POST /orders — طلب فوري (الإسناد تلقائي إن لم يُرسل providerId) */
+/** POST /orders — طلب فوري (الإسناد تلقائي) */
 export function createOrder(body) {
   return api.post('/orders', body, { auth: true });
 }

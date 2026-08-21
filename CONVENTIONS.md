@@ -184,7 +184,7 @@ cp <file> "$TEMP/chk.jsx" && npx esbuild --outfile=/dev/null "$TEMP/chk.jsx"
 
 `?qa=<step>` يقفز أيضاً إلى أي شاشة (مفاتيح الخطوات في `App.js`)، لكن الشاشة
 تصل بلا `route.params`. لذلك `qaParams([...])` تقرأ المعطيات من الرابط:
-`?qa=bookingNew&serviceId=…&providerId=…`.
+`?qa=bookingNew&serviceId=…`.
 
 ## بيئة التشغيل
 

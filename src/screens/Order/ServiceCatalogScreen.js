@@ -40,7 +40,9 @@ const formatPrice = (value) => (value == null ? "" : Number(value).toLocaleStrin
 
 export default function ServiceCatalogScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
-  const providerId = route?.params?.providerId;
+  // شاشة الخدمات تُفتح من التبويب (بلا رجوع) أو مدفوعةً من شاشة أخرى (برجوع).
+  // كان هذا الوسيط `providerId` يُمرَّر إلى الطلب، وقد أُلغي: الإسناد آليّ.
+  const pushed = !!route?.params?.pushed;
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [services, setServices] = useState([]);
@@ -83,7 +85,6 @@ export default function ServiceCatalogScreen({ navigation, route }) {
   const open = (service) => navigation?.navigate?.("ServiceDetail", {
     serviceId: service.id || service._id,
     service,
-    providerId,
   });
 
   return (
@@ -97,7 +98,7 @@ export default function ServiceCatalogScreen({ navigation, route }) {
         }
       >
         <View style={styles.header}>
-          {providerId ? (
+          {pushed ? (
             <IconButton label="رجوع" onPress={() => navigation?.goBack?.()} icon={<ArrowRight size={20} color={colors.textHeading} />} />
           ) : null}
           <View style={styles.headerCopy}>
