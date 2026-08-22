@@ -2,12 +2,13 @@
 //  PaymentMethodsScreen — ٣٩ · طرق الدفع
 //
 //  شاشة مالية: الثقة قبل الجمال. ثلاث حقائق من عقد الخادم تحكمها:
-//   • `providerToken` معلَّم `select: false` فلا يُعاد إطلاقاً، والمعروض
-//     أقصاه آخر أربعة أرقام — **لا بيانات بطاقة كاملة في أي حال**.
+//   • **الطرق الفعّالة ثلاث لا أكثر**: نقداً، ونقاط الولاء، وشام كاش. والنقاط
+//     ليست طريقة تُحفظ هنا بل خصمٌ يُطبَّق على الطلب نفسه، فيبقى في هذا
+//     الدفتر خياران.
 //   • **النقد لا يُحذف** (`Cash payment method cannot be deleted`) وهو الأنسب
 //     لسياق السوق هنا، فيُعرض كخيار من الدرجة الأولى لا كبديل ثانوي.
-//   • **إضافة بطاقة تتطلّب `providerToken` من بوّابة دفع** غير مدمجة بعد،
-//     فالخيار يُعرض معطّلاً بسببه لا يُخفى.
+//   • **البطاقة المصرفية غير مدعومة**: لا بوّابة بطاقات مربوطة، والخيار
+//     يُعرض معطّلاً بسببه لا يُخفى — إخفاؤه يجعل المستخدم يبحث عنه.
 // ============================================================
 
 import React, { useCallback, useEffect, useState } from "react";
@@ -45,11 +46,13 @@ const idOf = (method) => method?.id || method?._id;
 
 const TYPE_META = {
   cash: { label: "الدفع نقداً", Icon: Money, hint: "تدفع للفني عند إتمام الخدمة", tone: "success" },
-  wallet: { label: "محفظة إلكترونية", Icon: Wallet, hint: "يُخصم من رصيد محفظتك", tone: "primary" },
-  card: { label: "بطاقة مصرفية", Icon: CreditCard, hint: "بطاقة محفوظة بأمان", tone: "info" },
+  cham_cash: { label: "شام كاش", Icon: Wallet, hint: "تُحوَّل إلى بوّابة شام كاش عند الدفع", tone: "primary" },
+  // متقاعدتان: تبقيان لعرض ما حُفظ سابقاً، ولا تُضافان من جديد
+  wallet: { label: "محفظة إلكترونية", Icon: Wallet, hint: "طريقة قديمة — استُبدلت بشام كاش", tone: "primary" },
+  card: { label: "بطاقة مصرفية", Icon: CreditCard, hint: "طريقة قديمة — غير مدعومة", tone: "info" },
 };
 
-const metaOf = (type) => TYPE_META[type] || TYPE_META.wallet;
+const metaOf = (type) => TYPE_META[type] || TYPE_META.cash;
 
 export default function PaymentMethodsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -86,7 +89,7 @@ export default function PaymentMethodsScreen({ navigation }) {
   }, [load]);
 
   const hasCash = items.some((item) => item.type === "cash");
-  const hasWallet = items.some((item) => item.type === "wallet");
+  const hasChamCash = items.some((item) => item.type === "cham_cash");
 
   const addMethod = async (type) => {
     setBusy(true);
@@ -95,7 +98,7 @@ export default function PaymentMethodsScreen({ navigation }) {
       await createPaymentMethod(
         type === "cash"
           ? { type: "cash", displayName: "الدفع نقداً", isDefault: items.length === 0 }
-          : { type: "wallet", displayName: "محفظة كار هيرو", brand: "Cham Cash", isDefault: items.length === 0 },
+          : { type: "cham_cash", displayName: "شام كاش", brand: "Cham Cash", isDefault: items.length === 0 },
       );
       await load({ silent: true });
     } catch (addError) {
@@ -157,7 +160,7 @@ export default function PaymentMethodsScreen({ navigation }) {
         <View style={styles.security}>
           <Lock size={16} weight="fill" color={colors.success} />
           <Text style={styles.securityText}>
-            لا نحفظ بيانات بطاقتك في التطبيق — يُخزَّن رمز آمن لدى بوّابة الدفع، ولا يظهر هنا سوى آخر أربعة أرقام.
+            لا نحفظ أي بيانات مالية في التطبيق — الدفع الإلكتروني يتم داخل بوّابة شام كاش نفسها، والتطبيق لا يرى سوى نتيجة العملية.
           </Text>
         </View>
 
@@ -198,12 +201,12 @@ export default function PaymentMethodsScreen({ navigation }) {
                 onPress={() => addMethod("cash")}
               />
             ) : null}
-            {!hasWallet ? (
+            {!hasChamCash ? (
               <OutlineButton
-                label="إضافة المحفظة الإلكترونية"
+                label="إضافة شام كاش"
                 icon={<Wallet size={17} color={colors.primary} />}
                 loading={busy}
-                onPress={() => addMethod("wallet")}
+                onPress={() => addMethod("cham_cash")}
               />
             ) : null}
 
@@ -213,7 +216,7 @@ export default function PaymentMethodsScreen({ navigation }) {
               <View style={styles.disabledCopy}>
                 <Text style={styles.disabledTitle}>إضافة بطاقة مصرفية</Text>
                 <Text style={styles.disabledHint}>
-                  غير متاحة بعد — تتطلّب ربط بوّابة الدفع بالبطاقات. الدفع نقداً والمحفظة متاحان الآن.
+                  غير مدعومة — لا توجد بوّابة بطاقات مربوطة. طرق الدفع المتاحة: نقداً، شام كاش، ونقاط الولاء التي تُخصم من قيمة الطلب.
                 </Text>
               </View>
             </View>

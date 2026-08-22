@@ -53,10 +53,11 @@ export const isActive = (status) => ACTIVE_STATUSES.includes(status);
 
 const PAYMENT_METHOD_MAP = {
   cash: 'نقداً عند الاستلام',
-  wallet: 'محفظة كار هيرو',
-  card: 'بطاقة مصرفية',
   points: 'نقاط الوفاء',
   cham_cash: 'شام كاش',
+  // متقاعدتان: لا تُنشآن من جديد، لكن طلبات قديمة تحملهما ويجب أن تُقرأ
+  wallet: 'محفظة كار هيرو',
+  card: 'بطاقة مصرفية',
   online: 'دفع إلكتروني',
 };
 
