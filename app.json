@@ -32,7 +32,8 @@
     ],
     "extra": {
       "apiBaseUrl": "https://car-hero-backend.onrender.com",
-      "tileUrlTemplate": null
+      "_tile_note": "بلاطات OpenStreetMap العامة: مجّانية بلا مفتاح وتكفي التطوير. سياسة استعمالها تمنع الأحمال الإنتاجية — عند النشر استبدلها بمزوّد يسمح بالتطبيقات (MapTiler / Stadia / Geoapify).",
+      "tileUrlTemplate": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
     }
   }
 }

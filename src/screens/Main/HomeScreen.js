@@ -3,21 +3,10 @@ import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import {
-  Bell,
-  CarBattery,
-  CaretLeft,
-  Drop,
-  GasPump,
-  Gear,
-  Key,
-  Lightning,
-  MapPin,
-  Tag,
-  Tire,
-  Truck,
-  Wrench,
-} from "phosphor-react-native";
+// `Truck` و`Lightning` تُستعملان في زخرفة الواجهة (خلفية البطاقة الرئيسية
+// وزرّ «اطلب خدمة الآن») لا في خريطة الخدمات — فتبقيان هنا بعد نقل الخريطة.
+import { Bell, CaretLeft, Lightning, MapPin, Tag, Truck } from "phosphor-react-native";
+import { iconForService } from "../../components/serviceIcon";
 import {
   EmptyState,
   ErrorState,
@@ -31,16 +20,8 @@ import { fetchServices, serviceName, servicePrice } from "../../services/service
 import { fetchOrders } from "../../services/ordersApi";
 import { ACTIVE_STATUSES, statusLabel } from "../../services/orderStatus";
 
-const ICONS = {
-  battery: CarBattery,
-  tire: Tire,
-  fuel: GasPump,
-  lockout: Key,
-  car_wash: Drop,
-  towing: Truck,
-  maintenance: Gear,
-  emergency: Lightning,
-};
+// خريطة الفئات انتقلت إلى `components/serviceIcon` ومعها مطابقة بالاسم:
+// الخدمة التي تصل بلا `category` كانت تسقط كلها على مفتاح الربط الافتراضي.
 
 // الاختصارات تحمل الوجهات التي لا يصلها الشريط السفلي.
 //
@@ -53,7 +34,7 @@ const QUICK_ACTIONS = [
   { key: "offers", Icon: Tag, label: "العروض", tone: colors.accent, bg: colors.accentSoft },
 ];
 
-const iconFor = (service) => ICONS[service?.category] || Wrench;
+const iconFor = iconForService;
 const formatPrice = (value) => Number(value || 0).toLocaleString("ar-EG");
 
 export default function HomeScreen({

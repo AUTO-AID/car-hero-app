@@ -17,18 +17,13 @@ import Text from "../../components/AppText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowClockwise,
-  CarBattery,
   CaretLeft,
-  Drop,
-  GasPump,
-  Key,
   NavigationArrow,
   SealCheck,
   Star,
-  Tire,
   Tray,
-  Wrench,
 } from "phosphor-react-native";
+import { iconForService } from "../../components/serviceIcon";
 import {
   AsyncContent,
   EmptyState,
@@ -52,15 +47,9 @@ const TABS = [
   { key: "cancelled", label: "ملغاة", statuses: ["cancelled", "rejected"] },
 ];
 
-function iconFor(order) {
-  const key = `${order?.serviceName || ""} ${order?.metadata?.category || ""}`.toLowerCase();
-  if (/(battery|بطار)/.test(key)) return CarBattery;
-  if (/(tire|إطار|اطار)/.test(key)) return Tire;
-  if (/(wash|غسيل)/.test(key)) return Drop;
-  if (/(fuel|وقود|بنزين)/.test(key)) return GasPump;
-  if (/(lock|key|فتح)/.test(key)) return Key;
-  return Wrench;
-}
+// كانت هنا نسخة ثالثة من المطابقة تعرف خمس خدمات فقط — بلا «سحب» أصلاً،
+// و«غسيل» فيها قطرةُ ماء بينما هي بخّاخ في الرئيسية. المصدر الآن واحد.
+const iconFor = iconForService;
 
 function formatDate(value) {
   if (!value) return "";
