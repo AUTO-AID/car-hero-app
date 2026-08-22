@@ -41,7 +41,14 @@ export const ACTIVE_STATUSES = [
   'awaiting_customer_confirmation',
 ];
 
-export const canCancel = (status) => ['pending', 'accepted', 'provider_assigned'].includes(status);
+/**
+ * التراجع حقّ للعميل **قبل القبول فقط**.
+ *
+ * ما إن يقبل فنّي حتى يكون قد ارتبط بالطلب: أُغلقت العروض على البقيّة، وربّما
+ * تحرّك فعلاً. الخادم يفرض القاعدة نفسها (`OrderStateMachine`)، وهذه نسختها
+ * في الواجهة كي لا يُعرض زرّ ينتهي برفض من الخادم.
+ */
+export const canCancel = (status) => status === 'pending';
 export const canConfirmCompletion = (status) => ['awaiting_customer_confirmation', 'in_progress'].includes(status);
 export const canReview = (status) => status === 'completed';
 export const isActive = (status) => ACTIVE_STATUSES.includes(status);

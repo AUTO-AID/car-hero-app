@@ -372,8 +372,8 @@ export default function OrderTrackingScreen({ navigation, route }) {
               />
             </View>
 
-            {/* الإلغاء متاح فقط في الحالات التي يسمح بها canCancel — عرضه بعد
-                وصول الفني وعدٌ لا يمكن الوفاء به */}
+            {/* التراجع متاح قبل القبول فقط. وبعده لا يُخفى الزرّ بلا كلمة:
+                الاختفاء الصامت يُقرأ كعطل، ويدفع المستخدم للبحث عنه. */}
             {canCancel(status) ? (
               <OutlineButton
                 label="إلغاء الطلب"
@@ -381,6 +381,11 @@ export default function OrderTrackingScreen({ navigation, route }) {
                 onPress={() => setCancelOpen(true)}
                 style={styles.finalAction}
               />
+            ) : status === "accepted" || status === "provider_assigned" ? (
+              <Text style={styles.cancelLocked}>
+                قَبِل الفني طلبك وهو في طريقه إليك، فلم يعد الإلغاء متاحاً من التطبيق.
+                للضرورة تواصل مع الدعم.
+              </Text>
             ) : null}
 
             {status === "awaiting_customer_confirmation" ? (
@@ -473,4 +478,14 @@ const styles = StyleSheet.create({
   contactActions: { flexDirection: "row-reverse", gap: spacing.sm, marginTop: spacing.sm },
   contactButton: { flex: 1 },
   finalAction: { marginTop: spacing.xl },
+  cancelLocked: {
+    marginTop: spacing.xl,
+    fontSize: font.size.xxs,
+    color: colors.textMuted,
+    lineHeight: 19,
+    textAlign: "right",
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+  },
 });

@@ -327,6 +327,7 @@ export default function OrderDetailScreen({ navigation, route }) {
                     onPress={reorder}
                   />
 
+                  {/* قبل القبول فقط — والسبب يُكتب بدل أن يختفي الزرّ بصمت */}
                   {canCancel(order.status) ? (
                     <OutlineButton
                       danger
@@ -334,6 +335,11 @@ export default function OrderDetailScreen({ navigation, route }) {
                       icon={<X size={16} color={colors.danger} />}
                       onPress={() => { setActionError(""); setConfirmingCancel(true); }}
                     />
+                  ) : isActive(order.status) ? (
+                    <Text style={styles.cancelLocked}>
+                      قَبِل الفني هذا الطلب، فلم يعد الإلغاء متاحاً من التطبيق.
+                      للضرورة تواصل مع الدعم.
+                    </Text>
                   ) : null}
                 </View>
               </>
@@ -508,6 +514,15 @@ const styles = StyleSheet.create({
 
   banner: { marginTop: spacing.md },
   actions: { marginTop: spacing.lg, gap: spacing.sm },
+  cancelLocked: {
+    fontSize: font.size.xxs,
+    color: colors.textMuted,
+    lineHeight: 19,
+    textAlign: "right",
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.md,
+  },
   actionRow: { flexDirection: "row-reverse", alignItems: "center", gap: spacing.sm },
   grow: { flex: 1, width: "auto" },
   chatButton: {
